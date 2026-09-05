@@ -580,8 +580,6 @@ notebook, not a database shipped with the tool.
 
 ## Docs
 
-The documents below are in Russian.
-
 | file | subject |
 |---|---|
 | [docs/evidence.md](docs/evidence.md) | the evidence contract, slot states, locator stability |
