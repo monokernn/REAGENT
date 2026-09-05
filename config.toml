@@ -1,0 +1,86 @@
+# REAGENT configuration. Every network destination is listed here by hand.
+
+[agent]
+command = "claude"
+args = ["-p", "--output-format", "json"]
+response_field = "result"
+cost_field = "total_cost_usd"
+timeout_s = 600
+
+[budget]
+max_usd_per_day = 2.00
+max_usd_per_extraction = 0.40
+
+[rpc]
+# ethereum = "https://…"
+# arbitrum = "https://…"
+
+[sources]
+allowed_domains = ["docs.robinhood.com", "robinhood.com"]
+
+[corpus]
+max_doc_mb = 40
+# OCR не входит в сборку. При ocr = true assayer doctor честно об этом скажет;
+# документ без текстового слоя всё равно скачивается и хешируется, но
+# доказательства по нему не принимаются.
+ocr = false
+
+[extract]
+# Сколько символов каждого документа подаётся модели. Усечение отмечается
+# в extraction.json и печатается в досье, а не замалчивается.
+max_chars_per_doc = 120000
+# Второй мандат: чем это может кончиться для держателя. Каждый тезис обязан
+# нести дословную цитату, иначе гейт отсекает его до попадания в документ.
+challenge = false
+
+[gate]
+taint_threshold = 3
+halt_on_injection = true
+
+[gate.injection_patterns]
+# Text addressed at the agent rather than at the reader.
+en = [
+  "ignore previous",
+  "ignore all previous",
+  "disregard the above",
+  "disregard previous",
+  "system:",
+  "assistant:",
+  "you are an ai",
+  "you are an assistant",
+  "new instructions",
+  "the report must",
+  "do not mention",
+  "override the",
+  "as an ai language model",
+]
+ru = [
+  "игнорируй предыдущие",
+  "игнорируй все предыдущие",
+  "не обращай внимания на предыдущие",
+  "отчёт должен",
+  "отчет должен",
+  "новые инструкции",
+  "ты — ии",
+  "ты искусственный интеллект",
+  "система:",
+  "ассистент:",
+]
+other = [
+  "ignorez les instructions",
+  "vorherige anweisungen ignorieren",
+  "忽略以上",
+  "以前の指示を無視",
+]
+
+[language]
+# Blocking vocabulary. A hit fails the run; it is never silently rewritten.
+forbidden = [
+  "safe", "unsafe", "risky", "riskless", "buy", "sell", "hold",
+  "scam", "legit", "legitimate", "trustworthy", "reliable",
+  "audited", "verified safe", "guaranteed", "risk score",
+  "investment advice", "recommend", "recommendation",
+  "надёжный", "надежный", "рискованный", "безопасный", "опасный",
+  "покупать", "продавать", "скам", "мошенник", "рекомендуем", "рекомендация",
+  "риск-скор", "риск-балл",
+]

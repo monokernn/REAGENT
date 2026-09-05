@@ -1,0 +1,43 @@
+# Everything the tool produces at runtime. state/ holds fetched issuer documents,
+# spend records and the log: local evidence, never someone else's business.
+state/
+
+# Local working notes and the internal build spec.
+*_BUILD_PLAN.md
+demo-home/
+scratch/
+*.local.toml
+config.local.toml
+
+# Assets are one per holder and carry the URLs somebody chose to watch;
+# the sample stays, real ones do not.
+assets/*.toml
+!assets/example.toml.sample
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+.venv/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.tmp.*
+
+# Editors and OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini

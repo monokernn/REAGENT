@@ -1,0 +1,48 @@
+# Пример файла актива. Скопируйте в <chain>-<address>.toml и правьте,
+# либо заведите командой:
+#
+#   assayer add ethereum:0xАДРЕС --label "Assay Note" \
+#     --docs prospectus=https://docs.issuer.example/prospectus.pdf
+#
+# Файлы с расширением .sample не читаются: активами считаются только *.toml.
+
+label = "Assay Note ASSY"
+chain = "ethereum"
+address = "0x1111111111111111111111111111111111111111"
+chain_id = 1
+
+[[documents]]
+doc_id = "prospectus"
+url = "https://docs.issuer.example/prospectus.pdf"
+# то, что эмитент сам объявляет версией: нужно, чтобы поймать подмену
+# содержимого при неизменной заявленной версии
+version = "2026-01"
+
+[[documents]]
+doc_id = "custody"
+url = "https://docs.issuer.example/custody.html"
+
+# Заявленный залог. Заполняется руками и доказательством не является:
+# инструмент только сравнивает эти цифры с totalSupply и с датой,
+# которую подтверждает сам документ.
+[reserves]
+claim_doc = "custody"
+claimed_units = 1200000
+unit = "share"
+period_days = 30
+attested_at = "2026-01-31"
+# независимый проверяющий, если он назван; без него появляется
+# сигнал self_attested_reserves
+# attestor = "Independent Attestor LLP"
+
+# Пороги. Это ваши числа, а не суждение инструмента: он лишь сообщает,
+# что заданный порог пройден, и печатает и порог, и показание.
+# Порог, который нечем проверить, отмечается как неприменённый,
+# а не как выполненный.
+[alerts]
+# max_attestation_age_days = 30
+# min_timelock_delay_s = 172800
+# max_supply_over_claim_pct = 0.5
+# require_no_freeze = true
+# require_no_foreign_burn = true
+# require_immutable_logic = false

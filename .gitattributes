@@ -1,0 +1,7 @@
+# This project verifies claims against exact bytes, so line endings are pinned:
+# a checkout on Windows must not change the content a locator points at.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
