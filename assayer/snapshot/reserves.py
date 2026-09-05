@@ -40,31 +40,31 @@ def supply_vs_reserves(reserves: dict, facts: dict, chain_id: int | None,
     if claimed is None:
         return not_checked(
             "supply_vs_reserves", R_NO_RESERVE_CLAIM,
-            "в файле актива нет [reserves] claimed_units: сравнивать "
-            "totalSupply не с чем"), {}
+            "no [reserves] claimed_units in the asset file: there is "
+            "nothing to compare totalSupply against"), {}
     raw_supply = facts.get("total_supply")
     if raw_supply is None:
         return not_checked("supply_vs_reserves", R_RPC_ERROR,
-                           "totalSupply() прочитать не удалось"), {}
+                           "totalSupply() could not be read"), {}
     decimals = facts.get("decimals")
     scale = Decimal(10) ** int(decimals) if decimals is not None else Decimal(1)
     supply = Decimal(str(raw_supply)) / scale
     claim = Decimal(str(claimed))
-    unit = str(reserves.get("unit") or "единиц")
+    unit = str(reserves.get("unit") or "units")
     delta = supply - claim
-    parts = [f"totalSupply {_fmt(supply)} против заявленного залога "
+    parts = [f"totalSupply {_fmt(supply)} against declared collateral "
              f"{_fmt(claim)} {unit}"]
     if delta == 0:
-        parts.append("равно")
+        parts.append("equal")
     else:
         pct = (abs(delta) / claim * 100) if claim else None
-        word = ("токенов больше, чем заявленного залога" if delta > 0
-                else "заявленного залога больше, чем токенов")
-        parts.append(f"{word} на {_fmt(abs(delta))}"
+        word = ("more tokens than declared collateral" if delta > 0
+                else "more declared collateral than tokens")
+        parts.append(f"{_fmt(abs(delta))} {word}"
                      + (f" ({_fmt(pct.quantize(Decimal('0.01')))}%)" if pct else ""))
     if reserves.get("claim_doc"):
-        parts.append(f"цифра залога заявлена в файле актива со ссылкой на "
-                     f"{reserves['claim_doc']}")
+        parts.append(f"the collateral figure is declared in the asset file, "
+                     f"sourced from {reserves['claim_doc']}")
     over_pct = None
     if claim and delta > 0:
         over_pct = float((delta / claim * 100).quantize(Decimal("0.01")))
@@ -103,29 +103,29 @@ def attestation_freshness(reserves: dict, doc_results, corpus: Corpus,
     if not attested_raw:
         return not_checked(
             "attestation_freshness", R_NO_ATTESTATION_DATE,
-            "в файле актива нет [reserves] attested_at"), {}
+            "no [reserves] attested_at in the asset file"), {}
     attested = util.parse_date(str(attested_raw))
     if attested is None:
         return not_checked("attestation_freshness", R_NO_ATTESTATION_DATE,
-                           f"дату attested_at не удалось разобрать: "
+                           f"attested_at could not be parsed: "
                            f"{attested_raw!r}"), {}
     period = reserves.get("period_days")
     if period is None:
         return not_checked(
             "attestation_freshness", R_NO_PERIOD,
-            "в файле актива нет [reserves] period_days: давность без "
-            "обещанной периодичности ни о чём не говорит"), {}
+            "no [reserves] period_days in the asset file: an age without "
+            "a promised period says nothing"), {}
     claim_doc = reserves.get("claim_doc")
     if not claim_doc:
         return not_checked("attestation_freshness", R_NO_ATTESTATION_DOC,
-                           "в файле актива нет [reserves] claim_doc, "
-                           "называющего документ с отчётом"), {}
+                           "no [reserves] claim_doc naming the report "
+                           "document"), {}
     stored = {d.doc_id: d for d in doc_results if d.state == "stored"}
     entry = stored.get(str(claim_doc))
     if entry is None or not entry.sha256:
         return not_checked(
             "attestation_freshness", R_ATTESTATION_DOC_MISSING,
-            f"документа {claim_doc!r} в этом снапшоте нет"), {}
+            f"document {claim_doc!r} is not in this snapshot"), {}
     doc = corpus.get(entry.sha256)
     text = doc.text
     hit = None
@@ -137,17 +137,17 @@ def attestation_freshness(reserves: dict, doc_results, corpus: Corpus,
     if hit is None:
         return not_checked(
             "attestation_freshness", R_ATTESTATION_UNCONFIRMED,
-            f"заявленная дата {attested_raw} в документе {claim_doc} "
-            f"не встречается"), {}
+            f"the declared date {attested_raw} does not occur in "
+            f"{claim_doc}"), {}
 
     _quote, (start, end) = hit
     age = (as_of - attested).days
     overdue = age - int(period)
-    value = (f"отчёт о резервах от {attested.strftime('%Y-%m-%d')}, на момент "
-             f"снапшота ему {age} дн.; заявленная периодичность "
-             f"{int(period)} дн.")
+    value = (f"reserve report dated {attested.strftime('%Y-%m-%d')}, "
+             f"{age} days old at snapshot time; declared period "
+             f"{int(period)} days")
     if overdue > 0:
-        value += f"; просрочен на {overdue} дн."
+        value += f"; overdue by {overdue} days"
     computed = {"attested_at": attested.strftime("%Y-%m-%d"), "age_days": age,
                 "period_days": int(period), "overdue": overdue > 0,
                 "attestor": reserves.get("attestor")}

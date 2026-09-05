@@ -45,28 +45,29 @@ SIGNAL_NAMES: tuple[str, ...] = (
 )
 
 SIGNAL_MEANING: dict[str, str] = {
-    "upgradeable_logic": "логику контракта можно заменить на месте",
-    "upgrade_no_timelock": "апгрейд вступает в силу без периода ожидания",
-    "immutable_logic": "известных способов заменить логику нет",
-    "issuer_can_freeze_address": "эмитент может лишить адрес возможности "
-                                 "двигать баланс",
-    "issuer_can_burn_foreign_balance": "эмитент может уменьшить баланс, "
-                                       "которым не владеет",
-    "issuer_can_halt_transfers": "переводы можно остановить",
-    "issuer_can_mint": "выпуск можно увеличить",
-    "single_key_control": "существенное право держит один ключ, не мультиподпись",
-    "proxy_deployment": "токен задеплоен за proxy",
-    "attestation_overdue": "отчёт о резервах старше обещанной периодичности",
-    "no_attestation_period": "обещанная периодичность отчёта не заявлена",
-    "self_attested_reserves": "резервы подтверждает сам эмитент, независимый "
-                              "проверяющий не назван",
-    "tokens_exceed_declared_collateral": "токенов больше, чем заявленного залога",
-    "no_custodian_named": "кастодиан в документах не назван",
-    "no_insolvency_section": "о банкротстве эмитента в документах не сказано",
-    "no_redemption_terms": "об условиях выкупа в документах не сказано",
-    "debt_claim_not_ownership": "у держателя требование к эмитенту, а не доля "
-                                "в активе",
-    "offshore_issuer": "эмитент зарегистрирован в офшорной юрисдикции",
+    "upgradeable_logic": "contract logic can be replaced in place",
+    "upgrade_no_timelock": "upgrades take effect with no waiting period",
+    "immutable_logic": "no known way to replace the logic",
+    "issuer_can_freeze_address": "the issuer can block an address from "
+                                 "moving its balance",
+    "issuer_can_burn_foreign_balance": "the issuer can reduce a balance it "
+                                       "does not own",
+    "issuer_can_halt_transfers": "transfers can be halted",
+    "issuer_can_mint": "supply can be increased",
+    "single_key_control": "a material power is held by one key, not a multisig",
+    "proxy_deployment": "the token is deployed behind a proxy",
+    "attestation_overdue": "the reserve report is older than the promised period",
+    "no_attestation_period": "no promised reporting period is declared",
+    "self_attested_reserves": "reserves are reported with no named "
+                              "independent attestor",
+    "tokens_exceed_declared_collateral": "more tokens exist than declared "
+                                         "collateral",
+    "no_custodian_named": "no custodian is named in the documents",
+    "no_insolvency_section": "the documents say nothing about issuer insolvency",
+    "no_redemption_terms": "the documents say nothing about redemption terms",
+    "debt_claim_not_ownership": "the holder has a claim on the issuer, not "
+                                "a share of the asset",
+    "offshore_issuer": "the issuer is incorporated in an offshore jurisdiction",
 }
 
 

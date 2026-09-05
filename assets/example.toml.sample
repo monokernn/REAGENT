@@ -1,10 +1,10 @@
-# Пример файла актива. Скопируйте в <chain>-<address>.toml и правьте,
-# либо заведите командой:
+# An example asset file. Copy it to <chain>-<address>.toml and edit, or let the
+# CLI write one for you:
 #
-#   assayer add ethereum:0xАДРЕС --label "Assay Note" \
+#   assayer add ethereum:0xADDRESS --label "Assay Note" \
 #     --docs prospectus=https://docs.issuer.example/prospectus.pdf
 #
-# Файлы с расширением .sample не читаются: активами считаются только *.toml.
+# Files ending in .sample are ignored: only *.toml counts as an asset.
 
 label = "Assay Note ASSY"
 chain = "ethereum"
@@ -14,31 +14,32 @@ chain_id = 1
 [[documents]]
 doc_id = "prospectus"
 url = "https://docs.issuer.example/prospectus.pdf"
-# то, что эмитент сам объявляет версией: нужно, чтобы поймать подмену
-# содержимого при неизменной заявленной версии
+# Whatever the issuer itself calls the version of this document. The point of the
+# field is to catch a substitution of the content while the declared version
+# stays the same.
 version = "2026-01"
 
 [[documents]]
 doc_id = "custody"
 url = "https://docs.issuer.example/custody.html"
 
-# Заявленный залог. Заполняется руками и доказательством не является:
-# инструмент только сравнивает эти цифры с totalSupply и с датой,
-# которую подтверждает сам документ.
+# Declared collateral. Filled in by hand, and not evidence: the tool only
+# compares these figures against totalSupply and against the date the document
+# itself confirms.
 [reserves]
 claim_doc = "custody"
 claimed_units = 1200000
 unit = "share"
 period_days = 30
 attested_at = "2026-01-31"
-# независимый проверяющий, если он назван; без него появляется
-# сигнал self_attested_reserves
+# The independent attestor, if one is named. Without it the snapshot emits the
+# self_attested_reserves signal.
 # attestor = "Independent Attestor LLP"
 
-# Пороги. Это ваши числа, а не суждение инструмента: он лишь сообщает,
-# что заданный порог пройден, и печатает и порог, и показание.
-# Порог, который нечем проверить, отмечается как неприменённый,
-# а не как выполненный.
+# Thresholds. These are your numbers, not a judgement by the tool: it reports
+# that a number you wrote down was crossed, and prints the reading next to it.
+# A threshold that cannot be evaluated is marked as not applied, never as
+# satisfied.
 [alerts]
 # max_attestation_age_days = 30
 # min_timelock_delay_s = 172800

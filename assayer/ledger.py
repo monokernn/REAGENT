@@ -85,7 +85,7 @@ def check(p: util.Paths, config: dict, now: datetime | None = None) -> Budget:
         raise BudgetExceeded(
             "previous_extraction_over_limit",
             f"the last extraction cost ${current.last_extraction_usd:.4f}, "
-            f"limit ${per_call:.2f} — raise the limit or clear "
+            f"limit ${per_call:.2f}. Raise the limit or clear "
             f"last_extraction_usd in state/budget.json")
     return current
 

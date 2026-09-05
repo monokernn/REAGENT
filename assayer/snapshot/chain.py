@@ -361,7 +361,7 @@ class ChainReader:
 
         if not code:
             slots = [not_checked(name, R_RPC_ERROR,
-                                "по этому адресу нет кода")
+                                "no code at this address")
                      for name in _ONCHAIN_SCRIPT_SLOTS]
             return ChainReport(block=self.block, chain_id=self.chain_id,
                                slots=slots, facts=self.facts, errors=self.errors)
@@ -418,7 +418,7 @@ class ChainReader:
         code = self.code(address)
         if not code:
             controllers[address] = {"kind": "eoa"}
-            return f"{address} (EOA — один ключ, порога подписей нет)"
+            return f"{address} (EOA: a single key, no on-chain threshold)"
         selectors = find_selectors(code)
         if has_any(selectors, "get_threshold", "get_owners"):
             threshold = self._read_uint(address, "get_threshold")
@@ -427,14 +427,14 @@ class ChainReader:
             controllers[address] = {"kind": "multisig", "threshold": threshold,
                                     "owners": count}
             if threshold is not None and count is not None:
-                return f"{address} (мультиподпись, {threshold} из {count})"
-            return f"{address} (мультиподпись)"
+                return f"{address} (multisig, {threshold} of {count})"
+            return f"{address} (multisig)"
         delay = self._timelock_delay(address, selectors)
         if delay is not None:
             controllers[address] = {"kind": "timelock", "delay_s": delay}
-            return f"{address} (timelock, задержка {delay}с)"
+            return f"{address} (timelock, delay {delay}s)"
         controllers[address] = {"kind": "contract"}
-        return f"{address} (контракт)"
+        return f"{address} (contract)"
 
     def _read_uint(self, address: str, key: str) -> int | None:
         raw = self.call_key(key, to=address)
@@ -468,18 +468,19 @@ class ChainReader:
         if not present:
             self.facts["mint"] = None
             return Slot(slot="mint_authority", state=NOT_FOUND,
-                        value="в задеплоенном коде нет функции, увеличивающей выпуск",
+                        value="no supply-increasing function in the deployed code",
                         evidence=self.absence(
                             SEL[k] for k in ("mint_to", "mint_self", "issue",
                                              "increase_supply")))
         owner, method = self.owner_address()
         role_gated = bool(has_any(selectors, "has_role", "minter_role"))
-        parts = ["выпуск возможен: " + ", ".join(f"{_sig_of(k)}" for k in present)]
+        parts = ["minting is possible: "
+                 + ", ".join(f"{_sig_of(k)}" for k in present)]
         if owner:
-            parts.append("контролирует " + self.describe_controller(owner))
+            parts.append("controlled by " + self.describe_controller(owner))
         elif role_gated:
-            parts.append("доступ через роли AccessControl; состав держателей роли "
-                         "по хранилищу не восстанавливается")
+            parts.append("gated by AccessControl roles; who holds the role "
+                         "cannot be recovered from storage alone")
         self.facts["mint"] = {"functions": present, "owner": owner,
                               "role_gated": role_gated}
         return Slot(slot="mint_authority", state=FILLED, material=True,
@@ -495,7 +496,7 @@ class ChainReader:
         if not others and not self_only:
             self.facts["burn"] = None
             return Slot(slot="burn_authority", state=NOT_FOUND,
-                        value="в задеплоенном коде нет функции сжигания",
+                        value="no burn function in the deployed code",
                         evidence=self.absence(
                             SEL[k] for k in ("burn_self", "burn_from_address",
                                              "burn_from", "destroy_black_funds",
@@ -504,16 +505,16 @@ class ChainReader:
         self.facts["burn"] = {"foreign_balances": others, "self_only": self_only,
                               "owner": owner}
         if others:
-            value = ("может уменьшить баланс, которым не владеет: "
+            value = ("can reduce a balance it does not own: "
                      + ", ".join(_sig_of(k) for k in others))
             if owner:
-                value += "; контролирует " + self.describe_controller(owner)
+                value += "; controlled by " + self.describe_controller(owner)
             return Slot(slot="burn_authority", state=FILLED, material=True,
                         value=value,
                         evidence=self.evidence(method or "eth_getCode",
                                                owner or self.facts.get("code_hash")))
         return Slot(slot="burn_authority", state=FILLED,
-                    value="сжигание затрагивает только баланс вызывающего: "
+                    value="burn touches only the caller's own balance: "
                           + ", ".join(_sig_of(k) for k in self_only),
                     evidence=self.evidence("eth_getCode",
                                            self.facts.get("code_hash")))
@@ -523,7 +524,7 @@ class ChainReader:
         if not present:
             self.facts["pause"] = None
             return Slot(slot="pause", state=NOT_FOUND,
-                        value="в задеплоенном коде нет функции остановки переводов",
+                        value="no pause function in the deployed code",
                         evidence=self.absence(SEL[k] for k in
                                               ("pause", "unpause", "paused")))
         state_now = None
@@ -534,11 +535,11 @@ class ChainReader:
         owner, method = self.owner_address()
         self.facts["pause"] = {"functions": present, "paused": state_now,
                                "owner": owner}
-        value = "переводы можно остановить"
+        value = "transfers can be halted"
         if state_now is True:
-            value = "переводы остановлены прямо сейчас"
+            value = "transfers are halted right now"
         if owner:
-            value += "; контролирует " + self.describe_controller(owner)
+            value += "; controlled by " + self.describe_controller(owner)
         return Slot(slot="pause", state=FILLED, material=True, value=value,
                     evidence=self.evidence(method or "paused()",
                                            state_now if state_now is not None
@@ -552,15 +553,15 @@ class ChainReader:
         if not present:
             self.facts["freeze"] = None
             return Slot(slot="freeze", state=NOT_FOUND,
-                        value="в задеплоенном коде нет функции блокировки адреса "
-                              "или чёрного списка",
+                        value="no address-level freeze or blacklist function "
+                              "in the deployed code",
                         evidence=self.absence(SEL[k] for k in keys))
         owner, method = self.owner_address()
         self.facts["freeze"] = {"functions": present, "owner": owner}
-        value = ("любой адрес может быть лишён возможности двигать свой баланс: "
+        value = ("any address can be blocked from moving its balance: "
                  + ", ".join(_sig_of(k) for k in present))
         if owner:
-            value += "; контролирует " + self.describe_controller(owner)
+            value += "; controlled by " + self.describe_controller(owner)
         return Slot(slot="freeze", state=FILLED, material=True, value=value,
                     evidence=self.evidence(method or "eth_getCode",
                                            owner or self.facts.get("code_hash")))
@@ -572,7 +573,7 @@ class ChainReader:
         if not present:
             self.facts["oracle"] = None
             return Slot(slot="oracle", state=NOT_FOUND,
-                        value="контракт токена не читает источник цены",
+                        value="the token contract reads no price source",
                         evidence=self.absence(SEL[k] for k in keys))
         feed = None
         for key in ("oracle", "price_feed", "aggregator"):
@@ -594,10 +595,9 @@ class ChainReader:
                     staleness = block_ts - updated_at
         self.facts["oracle"] = {"functions": present, "feed": feed,
                                 "updated_at": updated_at}
-        value = "источник цены: " + (feed or ", ".join(_sig_of(k) for k in present))
+        value = "price source: " + (feed or ", ".join(_sig_of(k) for k in present))
         if staleness is not None:
-            value += (f"; последнее обновление за {staleness}с до блока "
-                      f"{self.block}")
+            value += (f"; last update {staleness}s before block {self.block}")
         return Slot(slot="oracle", state=FILLED, value=value,
                     evidence=self.evidence("latestRoundData()" if feed else
                                            _sig_of(present[0]),
@@ -676,8 +676,8 @@ class ChainReader:
         if implementation is None and diamond:
             self.facts["upgradeable"] = {"pattern": "diamond"}
             return (not_checked("upgradeable", R_UNKNOWN_PROXY,
-                                "EIP-2535 diamond: фасеты перечислимы, но эта "
-                                "сборка их не обходит"),
+                                "EIP-2535 diamond: the facets are enumerable, "
+                                "this build does not walk them"),
                     None, selectors)
 
         if implementation is None:
@@ -685,48 +685,48 @@ class ChainReader:
                 # A storage read that failed says nothing about the asset.
                 self.facts["upgradeable"] = None
                 return (not_checked("upgradeable", R_RPC_ERROR,
-                                    f"не удалось прочитать {unreadable} из "
-                                    f"{len(PROXY_SLOTS)} слотов хранилища proxy"),
+                                    f"{unreadable} of {len(PROXY_SLOTS)} proxy "
+                                    f"storage slots could not be read"),
                         None, selectors)
             if delegates and len(code) > 128:
                 self.facts["upgradeable"] = {"pattern": "unknown_delegating"}
                 return (not_checked("upgradeable", R_UNKNOWN_PROXY,
-                                    "код делегирует вызовы, но ни один известный "
-                                    "слот реализации не совпал"),
+                                    "the code delegates calls, but no known "
+                                    "implementation slot matched"),
                         None, selectors)
             self.facts["upgradeable"] = None
             return (Slot(slot="upgradeable", state=NOT_FOUND,
-                         value="ни один известный паттерн proxy не найден: "
-                               "логику по этому адресу нельзя заменить на месте",
+                         value="no recognised proxy pattern: the logic at "
+                               "this address cannot be replaced in place",
                          evidence=self.absence(PROXY_SLOTS.values())),
                     None, selectors)
 
         uups = bool(has_any(impl_selectors, "upgrade_to", "upgrade_to_and_call",
                             "proxiable_uuid"))
         flavour = "UUPS" if (uups and admin is None) else pattern
-        parts = [f"proxy ({flavour}); логика лежит по адресу {implementation}"]
+        parts = [f"proxy ({flavour}); the logic lives at {implementation}"]
         delay = None
         controller = admin
         if admin:
             described = self.describe_controller(admin)
-            parts.append("апгрейд контролирует " + described)
+            parts.append("upgrade controlled by " + described)
             admin_code = self.code(admin)
             delay = self._timelock_delay(admin, find_selectors(admin_code))
         elif uups:
             owner, _ = self.owner_address()
             if owner:
                 controller = owner
-                parts.append("апгрейд контролирует "
+                parts.append("upgrade controlled by "
                              + self.describe_controller(owner))
                 delay = self._timelock_delay(owner, find_selectors(self.code(owner)))
         if delay:
-            parts.append(f"задержка timelock {delay}с")
+            parts.append(f"timelock delay {delay}s")
         elif delay == 0:
             # A timelock configured to zero is not a waiting period.
-            parts.append("задержка timelock равна 0с: апгрейд вступает в силу "
-                         "без ожидания")
+            parts.append("timelock delay reads 0s: an upgrade takes effect "
+                         "with no waiting period")
         else:
-            parts.append("задержки на пути апгрейда не найдено")
+            parts.append("no timelock delay found on the upgrade path")
         self.facts["upgradeable"] = {"pattern": flavour,
                                      "implementation": implementation,
                                      "admin": admin, "controller": controller,
@@ -764,7 +764,7 @@ def read_chain(config: dict, chain: str, address: str,
             return ChainReport(
                 block=None, chain_id=chain_id,
                 slots=[not_checked(name, R_NO_RPC,
-                                   f"в config.toml нет [rpc] {chain}")
+                                   f"no [rpc] {chain} entry in config.toml")
                        for name in _ONCHAIN_SCRIPT_SLOTS],
                 facts={}, errors=[f"missing rpc endpoint for {chain}"])
         rpc = JsonRpc(url)

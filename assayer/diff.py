@@ -83,10 +83,10 @@ def diff_snapshots(before: dict, after: dict) -> list[dict]:
             same_version = (old.get("version") or None) == (new.get("version") or None)
             detail = None
             if same_version and old.get("version"):
-                detail = (f"заявленная версия осталась {old.get('version')}, "
-                          f"содержимое другое")
+                detail = (f"the declared version stayed {old.get('version')}, "
+                          f"the content differs")
             elif same_version:
-                detail = "в файле актива не заявлена версия, сравнивать нечего"
+                detail = "the asset file declares no version to compare"
             changes.append(_change("document_replaced", doc_id, old_sha, new_sha,
                                    material=True, detail=detail))
 
@@ -175,7 +175,7 @@ _SHORTEN = 60
 
 def _short(value: Any) -> str:
     if value is None:
-        return "—"
+        return "-"
     text = str(value)
     if len(text) > _SHORTEN:
         return text[:_SHORTEN - 1] + "…"
@@ -189,34 +189,34 @@ def describe(change: dict) -> str:
     before, after = change.get("from"), change.get("to")
     detail = change.get("detail") or change.get("excerpt")
     if kind == "document_replaced":
-        line = (f"документ {subject}: содержимое подменено "
+        line = (f"document {subject}: content was substituted "
                 f"({_short(before)[:12]} -> {_short(after)[:12]})")
     elif kind == "document_added":
-        line = f"документ {subject}: добавлен в наблюдение"
+        line = f"document {subject}: added to surveillance"
     elif kind == "document_removed":
-        line = f"документ {subject}: убран из наблюдения"
+        line = f"document {subject}: removed from surveillance"
     elif kind == "document_state":
-        line = f"документ {subject}: {_short(before)} -> {_short(after)}"
+        line = f"document {subject}: {_short(before)} -> {_short(after)}"
     elif kind == "slot_state":
-        line = f"{subject}: состояние {_short(before)} -> {_short(after)}"
+        line = f"{subject}: state {_short(before)} -> {_short(after)}"
     elif kind == "slot_value":
         line = f"{subject}: {_short(before)} -> {_short(after)}"
     elif kind == "fact":
         line = f"{subject}: {_short(before)} -> {_short(after)}"
     elif kind == "injection_new":
-        line = f"{subject}: новая находка, {_short(after)}"
+        line = f"{subject}: new finding, {_short(after)}"
     elif kind == "docs_hash":
-        line = "набор документов изменился"
+        line = "the document set changed"
     elif kind == "counter":
-        line = f"счётчик {subject}: {_short(before)} -> {_short(after)}"
+        line = f"counter {subject}: {_short(before)} -> {_short(after)}"
     elif kind == "slot_added":
-        line = f"{subject}: появился, состояние {_short(after)}"
+        line = f"{subject}: appeared, state {_short(after)}"
     elif kind == "slot_removed":
-        line = f"{subject}: исчез из документа"
+        line = f"{subject}: gone from the document"
     else:
         line = f"{kind} {subject}: {_short(before)} -> {_short(after)}"
     if detail:
-        line += f" — {detail}"
+        line += f"; {detail}"
     return line
 
 

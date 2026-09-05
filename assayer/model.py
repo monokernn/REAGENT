@@ -442,7 +442,7 @@ def _toml_str(value: str) -> str:
 
 
 def asset_to_toml(asset: Asset) -> str:
-    """Minimal TOML emitter — assayer writes only this one shape."""
+    """Minimal TOML emitter: assayer writes only this one shape."""
     lines = [
         f"label = {_toml_str(asset.label)}",
         f"chain = {_toml_str(asset.chain)}",

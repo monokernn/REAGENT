@@ -20,17 +20,17 @@ allowed_domains = ["docs.robinhood.com", "robinhood.com"]
 
 [corpus]
 max_doc_mb = 40
-# OCR не входит в сборку. При ocr = true assayer doctor честно об этом скажет;
-# документ без текстового слоя всё равно скачивается и хешируется, но
-# доказательства по нему не принимаются.
+# OCR is not built in. With ocr = true, assayer doctor says so plainly; a
+# document with no text layer is still fetched and hashed, but no evidence is
+# accepted from it.
 ocr = false
 
 [extract]
-# Сколько символов каждого документа подаётся модели. Усечение отмечается
-# в extraction.json и печатается в досье, а не замалчивается.
+# How many characters of each document are handed to the model. Truncation is
+# recorded in extraction.json and printed in the dossier, never hidden.
 max_chars_per_doc = 120000
-# Второй мандат: чем это может кончиться для держателя. Каждый тезис обязан
-# нести дословную цитату, иначе гейт отсекает его до попадания в документ.
+# The second mandate: how this can end for the holder. Every thesis must carry a
+# verbatim quote, or the gate cuts it before it reaches the document.
 challenge = false
 
 [gate]
@@ -38,7 +38,9 @@ taint_threshold = 3
 halt_on_injection = true
 
 [gate.injection_patterns]
-# Text addressed at the agent rather than at the reader.
+# Text addressed at the agent rather than at the reader. The detector is code,
+# this list is configuration, and it stays multilingual on purpose: an issuer
+# document can be written in any language.
 en = [
   "ignore previous",
   "ignore all previous",
@@ -75,8 +77,13 @@ other = [
 
 [language]
 # Blocking vocabulary. A hit fails the run; it is never silently rewritten.
+# Verbatim quotes are exempt, so a prospectus may contain any of these words.
+# Kept multilingual for the same reason as the patterns above.
+#
+# "hold" is deliberately absent: this domain is full of holders and holdings,
+# and a bare verb cannot be told apart from the buy/sell/hold sense mechanically.
 forbidden = [
-  "safe", "unsafe", "risky", "riskless", "buy", "sell", "hold",
+  "safe", "unsafe", "risky", "riskless", "buy", "sell",
   "scam", "legit", "legitimate", "trustworthy", "reliable",
   "audited", "verified safe", "guaranteed", "risk score",
   "investment advice", "recommend", "recommendation",
