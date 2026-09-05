@@ -6,6 +6,8 @@ state/
 *_BUILD_PLAN.md
 demo-home/
 scratch/
+# Working directory of tools/record_demo.py, created beside the repo.
+.assayer-demo/
 *.local.toml
 config.local.toml
 

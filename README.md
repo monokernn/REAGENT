@@ -20,6 +20,14 @@ The tool produces a document; the person decides.
 *A reagent is what an assay office puts a sample through to find out what the
 metal is actually made of. Hence the name.*
 
+![assayer in a terminal](media/demo.gif)
+
+*A real session, rendered frame by frame: the documents come over HTTP from a
+local server, the on-chain slots over JSON-RPC from a local stub, and between the
+two snapshots the prospectus really is replaced behind the tool's back. Only the
+issuer is fictional. Nothing here costs a token: `extract` is not even available,
+since no agent CLI is installed.*
+
 ---
 
 ## Table of contents
