@@ -4,8 +4,8 @@
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
-**REAGENT takes the contract address of a tokenised real-world asset and the
-issuer's documents, and produces one readable sheet.**
+**REAGENT is a surveillance tool for tokenised real-world assets (RWA). It takes
+a contract address and the issuer's documents, and produces one readable sheet.**
 
 It answers four questions:
 
@@ -13,6 +13,16 @@ It answers four questions:
 - what the issuer can do to your balance technically,
 - what changed since the last check,
 - which piece of evidence each statement rests on.
+
+A blockchain keeps an honest record of the token. It keeps no record of the
+existence or the status of the real asset: that lives in the issuer's prospectus,
+in the custodian's statement, in the jurisdiction of incorporation, and in the
+powers the issuer kept for itself inside the contract. The holder sees a company
+name and a chart. The prospectus may say this is a debt note of an offshore
+issuer carrying no shareholder rights, and the contract may say the issuer can
+freeze any address and replace the logic with no delay. All of it is public, and
+none of it gets read: the documents are long, the contracts are unreadable by
+eye, and both change quietly. REAGENT works in that gap.
 
 Locally. No private keys, no transactions, no opinion about what you should do.
 The tool produces a document; the person decides.
@@ -28,13 +38,20 @@ two snapshots the prospectus really is replaced behind the tool's back. Only the
 issuer is fictional. Nothing here costs a token: `extract` is not even available,
 since no agent CLI is installed.*
 
+**A live illustration of the gap.** Robinhood Stock Tokens: the interface shows
+the ticker and the price of a familiar company, while the prospectus describes
+tokenised debt securities of an issuer incorporated in Jersey. They give economic
+exposure to the price of the underlying share, but they do not make the holder a
+shareholder and carry no shareholder rights. This is not an assessment of the
+company or of the instrument. It is an illustration that the interface and the
+document say different things, and that nobody reads the second one.
+
 ---
 
 ## Table of contents
 
 | section | what is in it |
 |---|---|
-| [What RWA is](#what-rwa-is-and-where-the-gap-opens) | real-world assets, and the gap REAGENT works in |
 | [The idea](#the-idea) | three artefacts, and what falls out of separating them |
 | [Example dossier](#example-dossier) | the actual output, in full |
 | [Start](#start) | install, configure, first snapshot |
@@ -45,48 +62,6 @@ since no agent CLI is installed.*
 | [Requirements](#requirements) | Python, RPC, optional agent CLI |
 | [Tests](#tests) | what is held by a blocking test |
 | [The registry](#the-registry-of-known-cases) | signal matching against past failures |
-
----
-
-## What RWA is, and where the gap opens
-
-**RWA stands for real-world assets**, the term the industry uses for tokens that
-represent something outside the chain. Tokenising one means issuing a token that
-stands for a share, a bond, a fund unit, metal or property.
-
-**The appeal is concrete:**
-
-- trading around the clock,
-- lots divisible to a fraction of a percent,
-- settlement in seconds instead of two days,
-- composability, since the token can be posted as collateral elsewhere.
-
-**The weak point is just as concrete.** A blockchain keeps an honest record of the
-token. It keeps no record of the existence or the status of the real asset. Those
-live in four places, none of them on chain:
-
-1. the issuer's prospectus,
-2. the custodian's statement,
-3. the jurisdiction of incorporation,
-4. the powers the issuer kept for itself inside the contract.
-
-The holder sees a company name and a chart. The prospectus may say this is a debt
-note of an offshore issuer carrying no shareholder rights. The contract may say
-the issuer can freeze any address and replace the logic with no delay. All of it
-is public. None of it gets read: the documents are long, the contracts are
-unreadable by eye, and both change quietly.
-
-**A live illustration.** Robinhood Stock Tokens: the interface shows the ticker
-and the price of a familiar company, while the prospectus describes tokenised debt
-securities of an issuer incorporated in Jersey. They give economic exposure to the
-price of the underlying share, but they do not make the holder a shareholder and
-carry no shareholder rights. This is not an assessment of the company or of the
-instrument. It is an illustration that the interface and the document say
-different things, and that nobody reads the second one.
-
-REAGENT works in exactly that gap. It does not decide whether an asset is good or
-bad. It shows what is written, what is not written, what is recorded in the
-contract, and it states just as loudly what it could not check.
 
 ---
 
