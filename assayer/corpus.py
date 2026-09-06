@@ -96,6 +96,14 @@ class CorpusDoc:
         return page or 1
 
 
+@dataclass
+class CorpusProblem:
+    """One stored document that no longer matches how it is filed."""
+    sha256: str
+    kind: str
+    detail: str
+
+
 class Corpus:
     def __init__(self, root: Path):
         self.root = Path(root)
@@ -117,6 +125,50 @@ class Corpus:
             return []
         return sorted(d.name for d in self.root.iterdir()
                       if d.is_dir() and (d / "canonical.txt").exists())
+
+    def check(self, deep: bool = False) -> list["CorpusProblem"]:
+        """Is every stored document still answering to the name it is filed under?
+
+        Content addressing is the whole reason a locator written months ago still
+        points at the same characters. That promise rests on bytes in a directory
+        anyone can edit, so it is worth re-reading rather than assuming: the
+        shallow pass checks that nothing has gone missing, and ``deep`` re-hashes
+        each original and compares it with the directory it lives in.
+
+        A document whose bytes no longer hash to its own name is not a small
+        problem. Every quote verified against it was checked against different
+        content, so the finding is reported rather than repaired.
+        """
+        problems: list[CorpusProblem] = []
+        if not self.root.exists():
+            return problems
+        for entry in sorted(self.root.iterdir()):
+            if not entry.is_dir():
+                continue
+            sha = entry.name
+            if not (entry / "canonical.txt").exists():
+                problems.append(CorpusProblem(sha, "missing_canonical",
+                                              "canonical.txt is gone, so no quote "
+                                              "can be checked against this document"))
+                continue
+            if not (entry / "meta.json").exists():
+                problems.append(CorpusProblem(sha, "missing_meta",
+                                              "meta.json is gone: the extractor and "
+                                              "the page offsets are unknown"))
+            originals = sorted(entry.glob("original.*"))
+            if not originals:
+                problems.append(CorpusProblem(sha, "missing_original",
+                                              "the fetched bytes are gone, so the "
+                                              "hash cannot be re-checked"))
+                continue
+            if deep:
+                actual = util.sha256_bytes(originals[0].read_bytes())
+                if actual != sha:
+                    problems.append(CorpusProblem(
+                        sha, "hash_mismatch",
+                        f"{originals[0].name} now hashes to {actual[:12]}: the "
+                        f"stored bytes are not the ones this entry is named for"))
+        return problems
 
     def put(
         self,

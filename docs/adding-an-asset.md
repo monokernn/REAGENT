@@ -114,9 +114,18 @@ it convenient in cron.
 ## 4. Check the setup
 
 ```bash
-assayer doctor            # config, RPC, agent CLI, document domains
+assayer doctor            # config, RPC, agent CLI, document domains, corpus
 assayer doctor --network  # plus whether the documents are actually reachable
+assayer doctor --deep     # plus re-hashing every stored document
 ```
+
+The corpus check is worth its own mention. Every locator in every dossier
+addresses bytes in `state/corpus/`, and those bytes sit in an ordinary directory.
+The default pass reports anything missing; `--deep` re-hashes each stored
+original and compares it with the name it is filed under. A document that no
+longer answers to its own hash is reported rather than repaired: quotes verified
+against it were checked against different content, and that is a fact about the
+archive, not something to quietly fix.
 
 ## 5. The first snapshot
 

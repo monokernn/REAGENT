@@ -157,3 +157,35 @@ def test_22d_an_unreadable_asset_file_does_not_hide_the_others(paths, config):
     (paths.assets / "broken.toml").write_text("this is not toml = [", encoding="utf-8")
     assert model.list_assets(paths) == []
     assert main(["--home", str(paths.root), "status"]) == OK
+
+
+def test_22e_doctor_catches_a_corpus_entry_edited_behind_its_back(paths, config,
+                                                                 asset, rpc, capsys):
+    """Content addressing is a promise about bytes on disk. It is worth checking.
+
+    A locator written months ago is only meaningful while the file it addresses
+    still hashes to the name it is filed under. Editing that file locally would
+    otherwise leave every quote citing content nobody verified.
+    """
+    from assayer.corpus import Corpus
+
+    take_snapshot(paths, config, asset, rpc, ROUTES, now=T1)
+    corpus = Corpus(paths.corpus)
+    stored = corpus.list()
+    assert stored, "the snapshot should have filled the corpus"
+    assert corpus.check(deep=True) == []
+
+    original = next((paths.corpus / stored[0]).glob("original.*"))
+    original.write_bytes(original.read_bytes() + b"\n% quietly appended\n")
+
+    # The shallow pass still sees a complete entry; only re-hashing finds it.
+    assert corpus.check() == []
+    problems = corpus.check(deep=True)
+    assert [p.kind for p in problems] == ["hash_mismatch"]
+    assert problems[0].sha256 == stored[0]
+
+    capsys.readouterr()
+    assert main(["--home", str(paths.root), "doctor", "--deep"]) == ERROR
+    printed = capsys.readouterr().out
+    assert "hash_mismatch" in printed
+    assert stored[0][:12] in printed

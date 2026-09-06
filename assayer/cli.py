@@ -701,6 +701,21 @@ def cmd_doctor(args) -> int:
                 out(f"  {asset.name} {document.doc_id}: {status}")
     if not args.network:
         out("  (document availability was not checked: --network)")
+
+    # The corpus is the one place where a silent local edit would go unnoticed
+    # and still be cited: every locator addresses bytes in it.
+    corpus = Corpus(p.corpus)
+    stored = corpus.list()
+    faults = corpus.check(deep=args.deep)
+    out(f"corpus: {len(stored)} documents"
+        + (", re-hashed" if args.deep else ", presence only (--deep to re-hash)"))
+    for fault in faults:
+        out(f"  {fault.sha256[:12]}: {fault.kind}. {fault.detail}")
+        problems += 1
+    if not faults and stored:
+        out("  every document still answers to the name it is filed under"
+            if args.deep else "  nothing missing")
+
     out("")
     out("problems: " + str(problems))
     return OK if problems == 0 else ERROR
@@ -807,6 +822,8 @@ def build_parser() -> argparse.ArgumentParser:
     doctor = sub.add_parser("doctor", help="RPC, documents, agent CLI")
     doctor.add_argument("--network", action="store_true",
                         help="check document availability over the network")
+    doctor.add_argument("--deep", action="store_true",
+                        help="re-hash every stored document against its own name")
     doctor.add_argument("--timeout", type=float, default=15.0)
     doctor.set_defaults(func=cmd_doctor)
 

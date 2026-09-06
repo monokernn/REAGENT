@@ -1,6 +1,6 @@
 # REAGENT
 
-![tests](https://img.shields.io/badge/tests-97%20passing-2ea44f)
+![tests](https://img.shields.io/badge/tests-98%20passing-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
@@ -278,7 +278,7 @@ on-chain powers and of document substitution.
 | `assayer scar new --from-text <file\|->` | decompose an account into signals | money |
 | `assayer scar signals` | the signal names snapshots produce | 0 |
 | `assayer status` | assets, spend, state | 0 |
-| `assayer doctor [--network]` | RPC, documents, agent CLI | 0 |
+| `assayer doctor [--network] [--deep]` | RPC, documents, agent CLI, corpus integrity | 0 |
 
 ### Exit codes
 
