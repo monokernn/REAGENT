@@ -34,7 +34,7 @@ since no agent CLI is installed.*
 
 | section | what is in it |
 |---|---|
-| [What RWA is](#what-rwa-is-and-where-the-gap-opens) | tokenisation, and the gap REAGENT works in |
+| [What RWA is](#what-rwa-is-and-where-the-gap-opens) | real-world assets, and the gap REAGENT works in |
 | [The idea](#the-idea) | three artefacts, and what falls out of separating them |
 | [Example dossier](#example-dossier) | the actual output, in full |
 | [Start](#start) | install, configure, first snapshot |
@@ -50,8 +50,9 @@ since no agent CLI is installed.*
 
 ## What RWA is, and where the gap opens
 
-Tokenising a real-world asset means issuing a token that stands for something off
-the chain: a share, a bond, a fund unit, metal, property.
+**RWA stands for real-world assets**, the term the industry uses for tokens that
+represent something outside the chain. Tokenising one means issuing a token that
+stands for a share, a bond, a fund unit, metal or property.
 
 **The appeal is concrete:**
 
