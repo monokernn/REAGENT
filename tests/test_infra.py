@@ -189,3 +189,29 @@ def test_22e_doctor_catches_a_corpus_entry_edited_behind_its_back(paths, config,
     printed = capsys.readouterr().out
     assert "hash_mismatch" in printed
     assert stored[0][:12] in printed
+
+
+def test_22f_the_injection_tail_counts_every_finding(capsys):
+    """"and N more" must count what was found, not what an iterator has left.
+
+    Undercounting is the one direction this line cannot be wrong in: a reader
+    who is told about three findings and eleven more behaves differently from
+    one told about three and seventeen.
+    """
+    from assayer.cli import _print_injections
+
+    def findings(n):
+        for i in range(n):
+            yield {"doc_id": f"doc{i}", "technique": "hidden_css",
+                   "excerpt": "…", "severity": "hidden"}
+
+    _print_injections(findings(20), limit=3)
+    printed = capsys.readouterr().out
+    assert "and 17 more" in printed
+    assert printed.count("hidden_css") == 3
+
+    # A list gets the same answer, and a short run says nothing about a tail.
+    _print_injections(list(findings(20)), limit=3)
+    assert "and 17 more" in capsys.readouterr().out
+    _print_injections(findings(2), limit=3)
+    assert "more" not in capsys.readouterr().out

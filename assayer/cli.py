@@ -57,9 +57,13 @@ def _asset(p: util.Paths, name: str) -> Asset:
 
 
 def _print_injections(findings: Iterable[dict], limit: int = 12) -> None:
+    # Counted once, up front: asking a half-consumed iterator for its length
+    # reports what is left rather than what was found, and undercounting the
+    # findings is the one direction this line must never be wrong in.
+    findings = list(findings)
     for index, finding in enumerate(findings):
         if index >= limit:
-            out(f"    … and {len(list(findings)) - limit} more")
+            out(f"    … and {len(findings) - limit} more")
             break
         page = f", p.{finding['page']}" if finding.get("page") else ""
         where = f", {finding['where']}" if finding.get("where") else ""
