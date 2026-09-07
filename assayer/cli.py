@@ -731,12 +731,28 @@ def _probe(url: str, allowed: list[str], timeout: float) -> str:
 
     if not docs_mod.domain_allowed(url, allowed):
         return "domain outside the whitelist"
-    request = urllib.request.Request(url, method="HEAD",
-                                     headers={"User-Agent": docs_mod.USER_AGENT})
-    try:
+
+    def ask(method: str, extra: dict[str, str]) -> str:
+        request = urllib.request.Request(
+            url, method=method,
+            headers={"User-Agent": docs_mod.USER_AGENT, **extra})
         with urllib.request.urlopen(request, timeout=timeout) as response:
             return (f"{getattr(response, 'status', 200)} "
                     f"{response.headers.get('Content-Type', '')}").strip()
+
+    try:
+        return ask("HEAD", {})
+    except urllib.error.HTTPError as exc:
+        # Plenty of servers refuse HEAD and serve the document perfectly well.
+        # Reporting that as unavailable would dress this tool's own choice of
+        # verb up as a fact about the issuer, so ask again for a single byte.
+        if exc.code not in (405, 501):
+            return f"HTTP {exc.code}"
+    except Exception as exc:
+        return f"{type(exc).__name__}: {exc}"
+
+    try:
+        return ask("GET", {"Range": "bytes=0-0"}) + "  (HEAD refused)"
     except urllib.error.HTTPError as exc:
         return f"HTTP {exc.code}"
     except Exception as exc:

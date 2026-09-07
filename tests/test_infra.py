@@ -215,3 +215,56 @@ def test_22f_the_injection_tail_counts_every_finding(capsys):
     assert "and 17 more" in capsys.readouterr().out
     _print_injections(findings(2), limit=3)
     assert "more" not in capsys.readouterr().out
+
+
+def test_22g_a_server_that_refuses_head_is_not_reported_as_unavailable():
+    """A refused verb is a fact about the request, not about the document.
+
+    Plenty of servers answer HEAD with 405 and serve the file happily. Printing
+    that as unavailable would put this tool's own choice of method on the sheet
+    as if it were the issuer's doing, which is the confusion the whole programme
+    exists to avoid.
+    """
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    from assayer.cli import _probe
+
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+
+        def do_HEAD(self):
+            if self.path == "/missing":
+                self.send_response(404)
+            else:
+                self.send_response(405)
+                self.send_header("Allow", "GET")
+            self.end_headers()
+
+        def do_GET(self):
+            if self.path == "/missing":
+                self.send_response(404)
+                self.end_headers()
+                return
+            body = b"%PDF-1.4 prospectus"
+            self.send_response(200)
+            self.send_header("Content-Type", "application/pdf")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    port = server.server_address[1]
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        allowed = ["127.0.0.1"]
+        reachable = _probe(f"http://127.0.0.1:{port}/prospectus.pdf", allowed, 5)
+        assert "application/pdf" in reachable
+        assert "HEAD refused" in reachable
+        assert "405" not in reachable
+
+        # A document that really is gone still reports the code it answered with.
+        assert _probe(f"http://127.0.0.1:{port}/missing", allowed, 5) == "HTTP 404"
+    finally:
+        server.shutdown()

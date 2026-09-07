@@ -1,6 +1,6 @@
 # REAGENT
 
-![tests](https://img.shields.io/badge/tests-99%20passing-2ea44f)
+![tests](https://img.shields.io/badge/tests-100%20passing-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
