@@ -4,8 +4,8 @@
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
-**REAGENT (RWA Evidence Agent)** takes the contract address of a tokenised
-real-world asset and the issuer's documents, and produces one readable sheet.
+> **REAGENT** *(RWA Evidence Agent)* takes the contract address of a tokenised
+> real-world asset and the issuer's documents, and produces one readable sheet.
 
 It answers four questions:
 
@@ -27,8 +27,8 @@ eye, and both change quietly. REAGENT works in that gap.
 Locally. No private keys, no transactions, no opinion about what you should do.
 The tool produces a document; the person decides.
 
-> A *reagent* is what an assay office puts a sample through to find out what
-> the metal is actually made of. Hence the name.
+*A reagent is what an assay office puts a sample through to find out what the
+metal is actually made of. Hence the name.*
 
 ![assayer in a terminal](media/demo.gif)
 
