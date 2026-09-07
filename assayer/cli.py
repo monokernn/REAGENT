@@ -764,7 +764,8 @@ def _probe(url: str, allowed: list[str], timeout: float) -> str:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="assayer",
-        description="Evidence-backed surveillance of tokenised real-world assets. "
+        description="REAGENT (RWA Evidence Agent): evidence-backed surveillance "
+                    "of tokenised real-world assets. "
                     "Read-only: no keys, no transactions, no advice.")
     parser.add_argument("--version", action="version", version=f"assayer {__version__}")
     parser.add_argument("--home", help="project root (default: search upwards, "
