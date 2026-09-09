@@ -79,8 +79,9 @@ def supply_vs_reserves(reserves: dict, facts: dict, chain_id: int | None,
             computed)
 
 
-_DATE_FORMS = ("%d %B %Y", "%B %d, %Y", "%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y",
-               "%b %d, %Y", "%d %b %Y")
+# Rendering the declared date in every shape util.parse_date accepts, so the
+# search in the document covers exactly what the asset file may have said.
+_DATE_FORMS = util.DATE_FORMS
 
 
 def _date_strings(date: datetime) -> list[str]:

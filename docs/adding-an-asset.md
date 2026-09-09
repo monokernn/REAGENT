@@ -80,7 +80,7 @@ Filled in by hand, and not evidence. The tool only compares it against what is:
 | `unit` | what a unit of the collateral is called |
 | `claim_doc` | the `doc_id` of the document carrying the reserve report |
 | `period_days` | the promised reporting period |
-| `attested_at` | the date of the report |
+| `attested_at` | the date of the report, in any form the report itself might print it: `2026-01-31`, `31 January 2026`, `31.01.2026` |
 | `attestor` | the independent attestor, if there is one |
 
 If `attested_at` does not occur in the text of `claim_doc`, the

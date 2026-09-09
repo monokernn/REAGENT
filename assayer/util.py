@@ -126,10 +126,23 @@ def parse_ts_slug(slug: str) -> datetime:
     return datetime.strptime(slug, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
 
 
+# The one list of date shapes this programme understands. It is shared with the
+# reserve reader, which renders a declared date in every one of these forms to
+# look for it in the document: reading a date and finding it again must speak the
+# same language, or a holder who copies the date exactly as the report prints it
+# gets told the tool cannot parse it.
+DATE_FORMS = (
+    "%Y-%m-%d", "%Y-%m-%dT%H:%M:%SZ", "%Y%m%dT%H%M%SZ",
+    "%d %B %Y", "%B %d, %Y", "%d %b %Y", "%b %d, %Y",
+    "%d.%m.%Y", "%d/%m/%Y",
+)
+
+
 def parse_date(value: str) -> datetime | None:
-    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d", "%Y%m%dT%H%M%SZ"):
+    text = str(value).strip()
+    for fmt in DATE_FORMS:
         try:
-            return datetime.strptime(value, fmt).replace(tzinfo=timezone.utc)
+            return datetime.strptime(text, fmt).replace(tzinfo=timezone.utc)
         except ValueError:
             continue
     return None

@@ -161,3 +161,32 @@ def test_instrument_category_survives_wording(paths):
                    ' "sha256": "ab", "quote": "debt securities"}}]}')
     assert parsed.ok
     assert parsed.slots[0]["value"].startswith("debt_security, ")
+
+
+def test_a_declared_date_may_be_written_the_way_the_report_prints_it(paths, config,
+                                                                    rpc):
+    """Reading a date and finding it again must accept the same shapes.
+
+    A holder copies `attested_at` out of the custody statement, where it reads
+    "31 January 2026". If only the ISO form parses, the slot goes to not_checked
+    over the tool's own narrowness, while that very string is one of the forms it
+    renders when it goes looking for the date in the document.
+    """
+    from assayer import util
+    from assayer.snapshot import reserves as reserves_mod
+
+    assert util.DATE_FORMS is reserves_mod._DATE_FORMS
+    parsed = {util.parse_date(text) for text in
+              ("2026-01-31", "31 January 2026", "January 31, 2026",
+               "31 Jan 2026", "31.01.2026", "31/01/2026", "  2026-01-31 ")}
+    assert len(parsed) == 1 and None not in parsed
+    assert util.parse_date("not a date") is None
+    assert util.parse_date("2026-13-45") is None
+
+    # End to end: the slot fills from a date written the long way.
+    asset = reserve_asset(paths, attested_at="31 January 2026")
+    result = take_snapshot(paths, config, asset, rpc, routes(), now=T1)
+    slot = next(s for s in result.snapshot["slots"]["onchain"]
+                if s["slot"] == "attestation_freshness")
+    assert slot["state"] == FILLED, slot
+    assert "2026-01-31" in slot["value"]
