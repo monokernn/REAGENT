@@ -39,8 +39,21 @@ class SourceRefused(Exception):
 
 # ---------------------------------------------------------------- whitelist
 
+# The protocols a document may arrive over. The whitelist says where a fetch may
+# go; without this it says nothing about how, and urllib will happily speak ftp
+# or read a local file for any host that passes the domain check.
+ALLOWED_SCHEMES = ("http", "https")
+
+
 def host_of(url: str) -> str:
-    return (urllib.parse.urlsplit(url).hostname or "").lower()
+    # A trailing dot is the fully qualified form of the same name, so it is
+    # stripped: refusing issuer.example. while allowing issuer.example would be
+    # this tool inventing a difference DNS does not make.
+    return (urllib.parse.urlsplit(url).hostname or "").lower().rstrip(".")
+
+
+def scheme_allowed(url: str) -> bool:
+    return urllib.parse.urlsplit(url).scheme.lower() in ALLOWED_SCHEMES
 
 
 def domain_allowed(url: str, allowed: Iterable[str]) -> bool:
@@ -76,6 +89,8 @@ class _WhitelistRedirectHandler(urllib.request.HTTPRedirectHandler):
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D102
         self.chain.append(newurl)
+        if not scheme_allowed(newurl):
+            raise SourceRefused(newurl, "redirect_to_unsupported_scheme")
         if not domain_allowed(newurl, self.allowed):
             raise SourceRefused(newurl, "redirect_outside_whitelist")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
@@ -91,6 +106,8 @@ class UrllibFetcher:
         self.timeout_s = timeout_s
 
     def fetch(self, url: str) -> FetchResult:
+        if not scheme_allowed(url):
+            raise SourceRefused(url, "unsupported_scheme")
         if not domain_allowed(url, self.allowed):
             raise SourceRefused(url, "domain_not_whitelisted")
         chain: list[str] = []
@@ -102,6 +119,8 @@ class UrllibFetcher:
             if len(data) > self.max_bytes:
                 raise SourceRefused(url, "document_over_size_limit")
             final_url = response.geturl()
+            if not scheme_allowed(final_url):
+                raise SourceRefused(final_url, "redirect_to_unsupported_scheme")
             if not domain_allowed(final_url, self.allowed):
                 raise SourceRefused(final_url, "redirect_outside_whitelist")
             return FetchResult(

@@ -71,6 +71,9 @@ rules. The second run means improved rules apply to documents fetched months ago
 
 - Fetching happens only from domains listed by hand in
   `[sources] allowed_domains`, and the check precedes the socket.
+- Only `http` and `https` are fetched. The whitelist says where a fetch may go;
+  without this it would say nothing about how, and the underlying library speaks
+  ftp and reads local files for any host that passes the domain check.
 - A redirect leaving the whitelist aborts the fetch rather than being followed
   and judged afterwards.
 - Links inside documents are never followed. They land in the dossier under

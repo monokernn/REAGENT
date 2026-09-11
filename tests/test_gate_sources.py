@@ -119,3 +119,35 @@ def test_11b_the_dossier_carries_the_suggestions(paths, config, rpc):
     assert H_SOURCES in (result.text or "")
     assert "terms.elsewhere.example" in (result.text or "")
     assert "never followed" in (result.text or "")
+
+
+def test_11c_the_whitelist_governs_the_protocol_as_well_as_the_host():
+    """A domain on the list does not make every protocol fair game.
+
+    urllib speaks ftp and reads local files, so a document declared as
+    ftp://issuer.example/prospectus.pdf would have been fetched over FTP by a
+    tool whose whole provenance rule is "http from a hand-written list".
+    """
+    from assayer.snapshot.docs import (SourceRefused, UrllibFetcher,
+                                       domain_allowed, scheme_allowed)
+
+    fetcher = UrllibFetcher(["issuer.example"], 1_000_000)
+    for url in ("ftp://issuer.example/prospectus.pdf",
+                "file://issuer.example/etc/passwd",
+                "gopher://issuer.example/x"):
+        assert not scheme_allowed(url)
+        try:
+            fetcher.fetch(url)
+        except SourceRefused as exc:
+            assert exc.reason == "unsupported_scheme", url
+        else:
+            raise AssertionError(f"{url} was fetched")
+
+    assert scheme_allowed("https://issuer.example/p.pdf")
+    assert scheme_allowed("HTTP://issuer.example/p.pdf")
+
+    # The fully qualified form of a host is the same host, and is not refused.
+    assert domain_allowed("https://issuer.example./p.pdf", ["issuer.example"])
+    assert domain_allowed("https://docs.issuer.example./p.pdf", ["issuer.example"])
+    assert not domain_allowed("https://issuer.example.evil.com./p.pdf",
+                              ["issuer.example"])
