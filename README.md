@@ -1,11 +1,30 @@
 # REAGENT (RWA Evidence Agent)
 
-![tests](https://img.shields.io/badge/tests-101%20passing-2ea44f)
+![tests](https://img.shields.io/badge/tests-102%20passing-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
-**REAGENT (RWA Evidence Agent)** takes the contract address of a tokenised
-real-world asset and the issuer's documents, and produces one readable sheet.
+**REAGENT (RWA Evidence Agent)** is a shared evidence pipeline for tokenised
+real-world assets, Robinhood Stock Tokens among them. Give it a contract address
+and the issuer's documents, and a set of bounded roles moves the asset from raw
+sources to one readable sheet.
+
+The roles do not operate as isolated chatbots. They work from the same
+content-addressed workspace and hand off immutable artefacts:
+
+| role | responsibility |
+|---|---|
+| **Source Snapshot** | fetch and hash the allowed issuer documents |
+| **Contract Scan** | read the token's on-chain powers and relevant state |
+| **Claim Extraction** | fill a fixed legal questionnaire with quoted evidence |
+| **Source Verification** | check every proposed claim against canonical bytes |
+| **Evidence Dossier** | assemble accepted findings and preserve every rejection |
+
+Only **Claim Extraction** invokes a model. The other roles are deterministic
+programs: they collect, check, reject and render. The model may propose a claim,
+but it cannot approve its own work or write directly into the final dossier.
+This repository is the execution layer for that workflow: shared state,
+handoffs, evidence rules, spending limits and the final gate live here.
 
 It answers four questions:
 
@@ -52,7 +71,7 @@ document say different things, and that nobody reads the second one.
 
 | section | what is in it |
 |---|---|
-| [The idea](#the-idea) | three artefacts, and what falls out of separating them |
+| [The idea](#the-idea) | five bounded roles, three artefacts, one shared workspace |
 | [Example dossier](#example-dossier) | the actual output, in full |
 | [Start](#start) | install, configure, first snapshot |
 | [How it works](#how-it-works) | snapshot, extract, verify |
@@ -72,7 +91,8 @@ One observation, from which everything else follows:
 > Extraction is expensive and untrusted. Verification is cheap and trusted.
 > Therefore they must not be the same operation.
 
-Hence three separate artefact types on disk, each addressed by its content:
+The five roles hand work over through three separate artefact types on disk,
+each addressed by its content:
 
 | artefact | produced by | cost | trust |
 |---|---|---|---|
