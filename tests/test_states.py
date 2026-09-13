@@ -156,3 +156,33 @@ def test_18e_reserve_slots_state_why_they_were_not_checked(paths, config, asset,
     assert states["supply_vs_reserves"]["reason"] == "no_reserve_claim_declared"
     assert states["attestation_freshness"]["state"] == NOT_CHECKED
     assert states["attestation_freshness"]["reason"] == "no_attestation_date_declared"
+
+
+def test_18c_two_documents_cannot_share_one_doc_id(paths):
+    """doc_id is the name every citation is written against, so it is unique.
+
+    "[prospectus, p.4]" has to mean one document. With two of them under that
+    name the snapshot keeps whichever came last, and a quote verified against the
+    second would be read as coming from the first.
+    """
+    import pytest
+
+    from assayer import model, util
+
+    paths.assets.mkdir(parents=True, exist_ok=True)
+    (paths.assets / "ethereum-0xdupe.toml").write_text(
+        'label = "Two under one name"\n'
+        'chain = "ethereum"\n'
+        'address = "0x2222222222222222222222222222222222222222"\n'
+        '\n[[documents]]\ndoc_id = "prospectus"\n'
+        'url = "https://issuer.example/real.pdf"\n'
+        '\n[[documents]]\ndoc_id = "prospectus"\n'
+        'url = "https://issuer.example/other.pdf"\n', encoding="utf-8")
+
+    with pytest.raises(ValueError) as caught:
+        model.asset_from_toml(util.load_toml(paths.assets / "ethereum-0xdupe.toml"))
+    message = str(caught.value)
+    assert "prospectus" in message and "real.pdf" in message and "other.pdf" in message
+
+    # A refused file stays refused without hiding the assets around it.
+    assert model.list_assets(paths) == []

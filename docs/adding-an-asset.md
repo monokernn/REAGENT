@@ -37,7 +37,9 @@ assayer add ethereum:0xADDRESS \
 That writes `assets/ethereum-0xaddress.toml`. A `doc_id` can be given explicitly
 as `doc_id=url`; without one it is taken from the filename in the URL. The
 `doc_id` is the name evidence refers to, so it is not worth changing later: old
-dossiers will keep pointing at the previous name.
+dossiers will keep pointing at the previous name. It has to be unique within an
+asset, and a file that gives two documents the same one is refused rather than
+half loaded: a citation naming that document would otherwise be ambiguous.
 
 The file can be edited by hand:
 

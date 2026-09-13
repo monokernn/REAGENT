@@ -409,9 +409,20 @@ def load_asset(p: util.Paths, name: str) -> Asset:
 
 def asset_from_toml(raw: dict) -> Asset:
     docs = []
+    seen: dict[str, str] = {}
     for item in raw.get("documents", []) or []:
-        docs.append(Document(doc_id=str(item["doc_id"]), url=str(item["url"]),
-                             version=item.get("version")))
+        doc_id, url = str(item["doc_id"]), str(item["url"])
+        # doc_id is the name every citation in every dossier is written against.
+        # Two documents answering to one name would make "[prospectus, p.4]"
+        # ambiguous, and downstream the later one silently wins, so the file is
+        # refused rather than one of the two quietly chosen.
+        if doc_id in seen:
+            raise ValueError(
+                f"two documents share the doc_id {doc_id!r}: {seen[doc_id]} and "
+                f"{url}. Evidence cites documents by this name, so it has to be "
+                f"unique within an asset")
+        seen[doc_id] = url
+        docs.append(Document(doc_id=doc_id, url=url, version=item.get("version")))
     chain = str(raw["chain"]).lower()
     return Asset(
         chain=chain,
