@@ -150,7 +150,6 @@ def parse_date(value: str) -> datetime | None:
 
 # ---------------------------------------------------------------- text
 
-SOFT_HYPHEN = "­"
 _QUOTES = {
     "‘": "'", "’": "'", "‚": "'", "‛": "'",
     "“": '"', "”": '"', "„": '"',
@@ -168,9 +167,10 @@ def normalize_with_map(text: str) -> tuple[str, list[int]]:
     """Normalise for comparison while keeping a map back to raw offsets.
 
     ``map[i]`` is the offset in ``text`` of the character that produced
-    normalised character ``i``. Soft hyphens dropped, hyphenation across line
-    breaks joined, quotes and dashes canonicalised, whitespace runs collapsed to
-    one space, casefolded. Comparison only — never written back to the corpus.
+    normalised character ``i``. Invisible formatting characters dropped,
+    hyphenation across line breaks joined, quotes and dashes canonicalised,
+    whitespace runs collapsed to one space, casefolded. Comparison only — never
+    written back to the corpus.
     """
     out: list[str] = []
     idx: list[int] = []
@@ -179,7 +179,15 @@ def normalize_with_map(text: str) -> tuple[str, list[int]]:
     pending_space = False
     while i < n:
         ch = text[i]
-        if ch == SOFT_HYPHEN:
+        if ch > "" and unicodedata.category(ch) == "Cf":
+            # Invisible formatting characters: the soft hyphen a typesetter
+            # leaves inside a word, and its zero-width siblings that a page or
+            # a PDF carries and nobody can see — zero-width space, the two
+            # joiners, the word joiner, a byte order mark that drifted into
+            # the middle of a line. A person quoting the sentence types none
+            # of them, so leaving them in rejects a true quote and prints it
+            # as the model's invention. ASCII holds no such character, so the
+            # lookup is skipped for the bulk of a document.
             i += 1
             continue
         if ch == "-":

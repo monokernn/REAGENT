@@ -12,7 +12,8 @@ from assayer.model import FILLED, REJECTED
 from assayer.render import H_REJECTED
 from assayer.verify import gate as gate_mod
 from conftest import (
-    PROSPECTUS_URL, document_evidence, take_snapshot, write_extraction,
+    CUSTODY_URL, PROSPECTUS_URL, document_evidence, take_snapshot, write_asset,
+    write_extraction,
 )
 from fixtures import pdfs
 
@@ -154,3 +155,44 @@ def test_4d_model_may_not_produce_onchain_evidence(paths, config, asset, rpc):
     slot = next(s for s in result.dossier.legal if s.slot == "issuer")
     assert slot.state == REJECTED
     assert slot.reason == "evidence_kind_not_allowed"
+
+
+def test_5d_invisible_characters_do_not_turn_a_true_quote_into_an_invention(
+        paths, config, rpc):
+    """A page carries characters nobody can see; the quote must survive them.
+
+    Typesetters leave soft hyphens inside words, and web pages carry zero-width
+    spaces, joiners and stray byte order marks. A reader sees none of them and
+    quotes the sentence as it looks. If the gate compared those characters it
+    would delete a true claim and print it under REJECTED as the model's
+    invention — a fact about the model that never happened.
+    """
+    asset_obj = write_asset(paths, [("custody", CUSTODY_URL, "2026-01")])
+    html = (
+        "<html><body><p>"
+        "Holders do not ac​quire voting rights or share­holder "
+        "status in the Reference⁠Asset.﻿"
+        "</p></body></html>"
+    ).encode("utf-8")
+    snap = take_snapshot(paths, config, asset_obj, rpc,
+                         {CUSTODY_URL: ("text/html", html)})
+    snapshot = snap.snapshot
+
+    stored = next(d for d in snapshot["documents"] if d["doc_id"] == "custody")
+    canonical = (paths.corpus / stored["sha256"] / "canonical.txt").read_text(
+        encoding="utf-8")
+    assert "​" in canonical, "the document keeps what it was served"
+
+    # what the page looks like, and therefore what anybody would quote
+    quote = "Holders do not acquire voting rights or shareholder status"
+    assert quote not in canonical, "the raw text does not contain it verbatim"
+
+    slots = [{"slot": "holder_rights", "state": "filled",
+              "value": "no votes and no shareholder rights in the underlying",
+              "evidence": document_evidence(snapshot, "custody", quote)}]
+    result = gate_mod.build_dossier(paths, config, asset_obj, snapshot,
+                                    write_extraction(paths, snapshot, slots))
+
+    slot = next(s for s in result.dossier.legal if s.slot == "holder_rights")
+    assert slot.state == FILLED, "the sentence is in the document; only "                                  "characters nobody can see differ"
+    assert result.dossier.counters["fabrications"] == 0
