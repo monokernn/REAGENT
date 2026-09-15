@@ -9,6 +9,8 @@ real-world assets, Robinhood Stock Tokens among them. Give it a contract address
 and the issuer's documents, and a set of bounded roles moves the asset from raw
 sources to one readable sheet.
 
+![REAGENT — RWA Evidence Agent](media/banner1.gif)
+
 The roles do not operate as isolated chatbots. They work from the same
 content-addressed workspace and hand off immutable artefacts:
 
