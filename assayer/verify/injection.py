@@ -23,8 +23,15 @@ from dataclasses import dataclass
 from html.parser import HTMLParser
 from typing import Iterable
 
+from .. import util
+
 INSTRUCTION = "instruction"  # text speaking to a system
 HIDDEN = "hidden"            # text removed from view, no instruction phrasing
+
+# Invisible formatting characters, for the reading that treats them as a space
+# rather than as nothing. The visible-text scan does not need this: a reader
+# would see the words run together.
+_INVISIBLE = re.compile(r"[­​-‏⁠-⁤﻿]+")
 
 MIN_HIDDEN_CHARS = 12
 EXCERPT_CHARS = 220
@@ -72,9 +79,25 @@ def flatten_patterns(configured: dict | list | None) -> list[str]:
 
 
 def matched_pattern(text: str, patterns: Iterable[str]) -> str | None:
-    folded = re.sub(r"\s+", " ", text).casefold()
+    """Does any configured phrase occur in this text?
+
+    Compared under the same normalisation the quote gate uses, and for the same
+    reason turned around: whoever plants a sentence for the machine to obey is
+    exactly the party who will break it up with characters nobody can see. A
+    zero-width space inside a word is invisible to a reader, harmless to a
+    model, and enough to slip past a plain substring match.
+    """
+    # Two readings, because one invisible character can do two jobs: inside a
+    # word it splits the word, and in place of a space it fuses two. Dropping
+    # it fixes the first and creates the second, so hidden text is read both
+    # ways. Hidden text is short and adversarial by definition, so the second
+    # pass is cheap, and a false halt costs one look by a person — far less
+    # than a planted instruction reaching the model.
+    readings = (util.normalize_for_compare(text),
+                util.normalize_for_compare(_INVISIBLE.sub(" ", text)))
     for pattern in patterns:
-        if pattern and pattern in folded:
+        needle = util.normalize_for_compare(str(pattern))
+        if needle and any(needle in reading for reading in readings):
             return pattern
     return None
 
@@ -559,18 +582,24 @@ def scan_text(text: str, *, doc_id: str, sha256: str,
               patterns: Iterable[str]) -> list[Finding]:
     """Instruction phrasing in plainly visible text is still addressed at a machine."""
     findings: list[Finding] = []
-    folded = re.sub(r"\s+", " ", text).casefold()
+    # Same normalisation as matched_pattern, and the map with it so the offset
+    # reported points into the document as stored, not into a folded copy.
+    folded, index = util.normalize_with_map(text)
     for pattern in patterns:
-        start = folded.find(pattern)
+        needle = util.normalize_for_compare(str(pattern))
+        if not needle:
+            continue
+        start = folded.find(needle)
         while start != -1:
+            raw_at = index[start] if start < len(index) else start
             findings.append(Finding(
                 doc_id=doc_id, sha256=sha256, surface="text",
                 technique="text:addressed-to-system", severity=INSTRUCTION,
                 excerpt=_excerpt(folded[max(0, start - 80):start + 160]),
-                where=f"offset~{start}", pattern=pattern))
+                where=f"offset~{raw_at}", pattern=pattern))
             if len(findings) > 40:
                 return _dedupe(findings)
-            start = folded.find(pattern, start + len(pattern))
+            start = folded.find(needle, start + len(needle))
     return _dedupe(findings)
 
 
