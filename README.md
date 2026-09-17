@@ -1,15 +1,40 @@
 # REAGENT (RWA Evidence Agent)
 
-![tests](https://img.shields.io/badge/tests-103%20passing-2ea44f)
+![tests](https://img.shields.io/badge/tests-114%20passing-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
-**REAGENT (RWA Evidence Agent)** is a shared evidence pipeline for tokenised
-real-world assets, Robinhood Stock Tokens among them. Give it a contract address
-and the issuer's documents, and a set of bounded roles moves the asset from raw
-sources to one readable sheet.
+**REAGENT (RWA Evidence Agent)** turns a contract address into one readable
+sheet, and it works in two profiles.
+
+**A coin.** The default. Give it an address and it reads the deployed bytecode
+and storage: whether supply can still grow, whether an address can be blocked,
+whether transfers can be switched off after launch, what a transfer pays, what
+a wallet may hold, how much of the supply sits in the owner's own balance, and
+how much of the declared pool's LP is parked where nobody can move it. No
+documents, no model, nothing to spend.
+
+**An asset with documents.** The profile the tool started as. Give it the
+issuer's documents too and a set of bounded roles fills a fixed legal
+questionnaire with quoted evidence, for tokenised real-world assets — Robinhood
+Stock Tokens among them.
 
 ![REAGENT — RWA Evidence Agent](media/banner1.gif)
+
+## Two profiles, one machine
+
+| | `--coin` | the documents profile |
+|---|---|---|
+| what it reads | the contract | the contract **and** the issuer's documents |
+| slots | 12, all from bytecode and storage | 8 legal + 8 on-chain |
+| the model | never called | called once per changed snapshot |
+| cost | $0.00, always | ~$0.10–0.40 per extraction |
+| the gate | nothing to intersect: no claim was proposed | quotes, injections, provenance, language |
+| catches | a power that is still live, a pool whose LP is still movable | a prospectus that says something the interface does not |
+
+The second half of this file is about the documents profile. Everything below
+`The idea` applies to it; the coin profile is described in
+[Ordinary coins](#ordinary-coins).
 
 The roles do not operate as isolated chatbots. They work from the same
 content-addressed workspace and hand off immutable artefacts:
@@ -73,6 +98,7 @@ document say different things, and that nobody reads the second one.
 
 | section | what is in it |
 |---|---|
+| [Ordinary coins](#ordinary-coins) | the default profile: twelve readings, no documents, no model |
 | [The idea](#the-idea) | five bounded roles, three artefacts, one shared workspace |
 | [Example dossier](#example-dossier) | the actual output, in full |
 | [Start](#start) | install, configure, first snapshot |
@@ -83,6 +109,128 @@ document say different things, and that nobody reads the second one.
 | [Requirements](#requirements) | Python, RPC, optional agent CLI |
 | [Tests](#tests) | what is held by a blocking test |
 | [The registry](#the-registry-of-known-cases) | signal matching against past failures |
+
+---
+
+## Ordinary coins
+
+A memecoin has no prospectus, no custodian and no reserve report. The legal
+questionnaire therefore has nothing to be filled from, and the paid phase has
+nothing to read — so it is not called. Everything a holder can be told about one
+is a fact about bytecode and storage, and the coin profile reads it with scripts.
+
+```bash
+assayer add robinhood:0xADDRESS --coin --label "$PONS" --pool 0xPAIR
+assayer snap robinhood-0xaddress
+assayer show robinhood-0xaddress
+```
+
+`--pool` is optional and nothing is discovered without it: a pool the asset file
+does not name is a pool this tool does not read, and the `liquidity` slot says so
+under `NOT CHECKED` rather than going looking. A declared pool is checked to be a
+pair for *this* token before a single number from it is believed.
+
+### The twelve readings
+
+| slot | what is read |
+|---|---|
+| `ownership` | does the contract still answer to a live owner, and is it one key or a threshold |
+| `mint_authority` | can supply still be increased, and by whom |
+| `burn_authority` | can a balance the owner does not hold be reduced |
+| `pause` | can transfers be halted |
+| `freeze` | can one address be blocked from moving its balance |
+| `upgradeable` | can the logic be replaced in place, and after what delay |
+| `trading_switch` | can transfers be turned on or off after deployment |
+| `transfer_tax` | does a transfer pay a fee, and can that figure still be moved |
+| `transfer_limits` | per-transaction and per-wallet caps, as a share of supply |
+| `owner_holdings` | what share of supply sits in the owner's own balance |
+| `burned_supply` | what share sits at an address with no known key |
+| `liquidity` | how much of the token is in the declared pool, and how much of that pool's LP is parked |
+
+Six of them are the documents profile's own power slots, reused rather than
+reimplemented: the same questions about the same bytecode.
+
+### What the sheet looks like
+
+```
+ASSAY  ·  COIN  ·  $PONS  ·  ethereum:0x1111…  ·  2026-09-16
+
+! Powers over somebody else's balance are live in this contract: ownership,
+mint_authority, trading_switch, transfer_tax, transfer_limits.
+
+WHAT THIS IS
+  the contract calls itself Pons (PONS)                                    [chain]
+  total supply 1000000000000000000000000000, 18 decimals                   [chain]
+
+WHAT THE CONTRACT STILL ALLOWS
+  ⚠ ownership: the contract still answers to an owner:     [chain, block 21000000]
+  0x2222… (EOA: a single key, no on-chain threshold); the position can be
+  passed on: transferOwnership(address)
+  ○ freeze: no address-level freeze or blacklist function [absence, block 21000000]
+  in the deployed code
+  ⚠ transfer_tax: a cut is taken on transfer: totalFees()  [chain, block 21000000]
+  reads 5; the figure can be moved after deployment: setFees(uint256,uint256);
+  the contract does not declare the unit of these figures, so they are printed
+  as read
+  · liquidity: 25.0% of supply sits in the declared pool   [chain, block 21000000]
+  0x4444…; 96.0% of the pool's own LP token is parked at an address with no
+  known key
+
+THRESHOLDS SET IN THE ASSET FILE
+  ⚠ the owner address holds 5.0% of supply, threshold is 1.0%          [asset file]
+  (threshold crossed)
+
+COMPLETENESS: 8/12 slots   POWERS LIVE: 5   SPENT: $0.0000
+snapshot 87f45d9533ed  ·  no extraction: this profile calls no model  ·  block 21000000
+This sheet shows what the contract records. The person decides.
+```
+
+There is no score and no verdict, for the same reason as everywhere else in this
+tool. `POWERS LIVE: 5` is a count of readings, not a number that means anything
+on its own: five live powers on a coin whose pool is parked and five on one whose
+owner holds half the supply are five either way, and the reader is the one who
+weighs them.
+
+### Two units, and only one of them is invented
+
+A fee getter answers an integer. Whether `5` is five percent, half a percent or
+five basis points is a convention of a source this program never read, so the
+reading is printed with the function it came from and left alone. A cap is
+different: it is denominated in the token's own units, so dividing it by
+`totalSupply` is exact, and that is why `transfer_limits` prints a percentage
+while `transfer_tax` does not.
+
+### Thresholds
+
+The same contract as everywhere: your numbers, the reading printed beside them,
+and an explicit *not applied* whenever the reading is missing.
+
+```toml
+[alerts]
+require_renounced_ownership = true
+require_no_trading_switch = true
+require_no_transfer_tax = true
+require_no_freeze = true
+max_owner_share_pct = 5.0
+min_burnt_lp_pct = 95.0
+```
+
+`assayer watch` returns exit code 8 while any of them is crossed, which is what
+makes the coin profile useful in cron: a rug is not a slow drift, and the point
+of watching is to hear the owner key wake up.
+
+### What moves, and what counts as a change
+
+Two kinds of movement are told apart rather than both reported as *something
+changed*.
+
+| movement | in the snapshot hash | how it is watched |
+|---|---|---|
+| a balance drifting, a pool filling, a share of supply moving | no | the thresholds above |
+| a fee changed, a cap raised, ownership transferred, a switch flipped | yes | `snap` reports the snapshot as changed |
+
+If a drifting balance flipped the hash, `watch` would cry drift on every block
+and the holder would learn to ignore it.
 
 ---
 
@@ -259,6 +407,24 @@ git clone https://github.com/monokernn/REAGENT.git reagent && cd reagent
 pip install -e .
 ```
 
+A coin needs one line of configuration — an RPC endpoint for its chain:
+
+```toml
+[rpc]
+robinhood = "https://…"
+```
+
+```bash
+assayer doctor
+assayer add robinhood:0xADDRESS --coin --label "$PONS" --pool 0xPAIR
+assayer snap robinhood-0xaddress
+```
+
+That is the whole loop for the coin profile. It calls no model and spends
+nothing, so it can run as often as you like.
+
+### With documents
+
 Put an RPC endpoint and the domains you allow documents to be fetched from into
 `config.toml`:
 
@@ -288,9 +454,10 @@ on-chain powers and of document substitution.
 
 | command | what it does | cost |
 |---|---|---|
-| `assayer add <chain>:<address> --docs …` | register an asset | 0 |
+| `assayer add <chain>:<address> --coin [--pool …]` | register a coin | 0 |
+| `assayer add <chain>:<address> --docs …` | register an asset with documents | 0 |
 | `assayer snap <asset> [--all]` | take a snapshot; says whether anything changed | 0 |
-| `assayer extract <asset> [--force] [--challenge]` | fill the legal slots with a model | money |
+| `assayer extract <asset> [--force] [--challenge]` | fill the legal slots with a model; refuses a coin | money |
 | `assayer verify <asset> [--all]` | run the gate again | 0 |
 | `assayer show <asset> [--json]` | the latest dossier | 0 |
 | `assayer diff <asset> [a] [b]` | what changed between two snapshots | 0 |
@@ -535,6 +702,13 @@ file:
 | `test_artifacts.py` | 12 to 16 | determinism, free re-verification, substitution |
 | `test_states.py` | 17 to 18 | failed RPC, unknown proxy pattern |
 | `test_infra.py` | 19 to 22 | budgets, concurrent ledger writes, exit codes |
+| `test_coin.py` | — | the coin profile, end to end |
+
+`test_coin.py` holds the coin profile: that it reads without documents, without
+a model and without spending; that a given-up owner, a live owner and a contract
+that never had one are three different readings; that a pool which does not trade
+the token is refused rather than believed; and that a drifting balance is not
+reported as a change while a changed fee is.
 
 The rest came out of building it: `test_drift.py` on the quality of the diff,
 `test_scans.py` on a document with no text layer, `test_alerts.py` on thresholds,

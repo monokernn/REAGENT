@@ -12,8 +12,9 @@ from __future__ import annotations
 
 from . import diff as diff_mod
 from .model import (
-    E_ABSENCE, E_DOCUMENT, E_ONCHAIN, FILLED, LEGAL_SLOTS, NOT_CHECKED, NOT_FOUND,
-    ONCHAIN_SLOTS, REJECTED, Dossier, Evidence, Slot,
+    COIN_SLOTS, E_ABSENCE, E_DOCUMENT, E_ONCHAIN, FILLED, LEGAL_SLOTS,
+    NOT_CHECKED, NOT_FOUND, ONCHAIN_SLOTS, PROFILE_COIN, REJECTED, Dossier,
+    Evidence, Slot,
 )
 
 H_TITLE = "ASSAY"
@@ -30,10 +31,14 @@ H_INJECTIONS = "TEXT FOUND THAT SPEAKS TO THE AGENT"
 H_SOURCES = "SUGGESTED SOURCES"
 H_CONTEXT = "CONTEXT (NOT EVIDENCE)"
 H_FOOTER = "COMPLETENESS"
+# The coin sheet's own name for the powers section. A memecoin has a deployer
+# rather than an issuer, and the sentence under the header is about what the
+# deployed code still permits, so the header says that.
+H_POWERS_COIN = "WHAT THE CONTRACT STILL ALLOWS"
 
-SECTION_HEADERS = (H_WHAT, H_CHANGES, H_POWERS, H_ALERTS, H_NOT_FOUND,
-                   H_NOT_CHECKED, H_REJECTED, H_CHALLENGE, H_SCARS, H_INJECTIONS,
-                   H_SOURCES, H_CONTEXT)
+SECTION_HEADERS = (H_WHAT, H_CHANGES, H_POWERS, H_POWERS_COIN, H_ALERTS,
+                   H_NOT_FOUND, H_NOT_CHECKED, H_REJECTED, H_CHALLENGE, H_SCARS,
+                   H_INJECTIONS, H_SOURCES, H_CONTEXT)
 
 # Which section each state is allowed to appear in.
 STATE_SECTION = {
@@ -60,6 +65,13 @@ SLOT_LABEL = {
     "oracle": "price source",
     "supply_vs_reserves": "supply against collateral",
     "attestation_freshness": "report freshness",
+    "ownership": "ownership",
+    "trading_switch": "the transfers switch",
+    "transfer_tax": "a cut on transfer",
+    "transfer_limits": "caps on a transfer",
+    "owner_holdings": "the owner's own balance",
+    "burned_supply": "supply at a dead address",
+    "liquidity": "the declared pool",
 }
 
 WIDTH = 96

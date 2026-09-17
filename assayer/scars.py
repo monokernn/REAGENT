@@ -42,6 +42,16 @@ SIGNAL_NAMES: tuple[str, ...] = (
     "no_redemption_terms",
     "debt_claim_not_ownership",
     "offshore_issuer",
+    # produced only under the coin profile
+    "owner_not_given_up",
+    "ownership_given_up",
+    "transfers_can_be_switched",
+    "transfer_carries_a_cut",
+    "transfer_cut_is_movable",
+    "transfer_caps_present",
+    "owner_holds_a_large_share",
+    "lp_mostly_parked",
+    "lp_still_movable",
 )
 
 SIGNAL_MEANING: dict[str, str] = {
@@ -68,6 +78,19 @@ SIGNAL_MEANING: dict[str, str] = {
     "debt_claim_not_ownership": "the holder has a claim on the issuer, not "
                                 "a share of the asset",
     "offshore_issuer": "the issuer is incorporated in an offshore jurisdiction",
+    "owner_not_given_up": "the contract still answers to a live owner",
+    "ownership_given_up": "the owner position was handed to an address with "
+                          "no known key",
+    "transfers_can_be_switched": "transfers can be turned on or off after "
+                                 "deployment",
+    "transfer_carries_a_cut": "a fee is taken out of a transfer",
+    "transfer_cut_is_movable": "that fee can be changed after deployment",
+    "transfer_caps_present": "a per-transaction or per-wallet cap is kept",
+    "owner_holds_a_large_share": "the owner address holds five percent of "
+                                 "supply or more",
+    "lp_mostly_parked": "most of the pool's LP token sits at an address with "
+                        "no known key",
+    "lp_still_movable": "most of the pool's LP token can still be moved",
 }
 
 
@@ -224,6 +247,44 @@ def signals_of(legal: Iterable[Slot], onchain: Iterable[Slot],
 
     if facts.get("implementation"):
         out.add("proxy_deployment")
+
+    # ---- coin-only signals ---------------------------------------------
+    # Named for what was read, not for what it is taken to mean, so a case
+    # written into the registry a year from now still intersects with them.
+    ownership = by_name.get("ownership")
+    if ownership is not None:
+        if ownership.state == FILLED and ownership.material:
+            out.add("owner_not_given_up")
+        if ownership.state == FILLED and not ownership.material:
+            out.add("ownership_given_up")
+
+    switch = by_name.get("trading_switch")
+    if switch is not None and switch.state == FILLED and switch.material:
+        out.add("transfers_can_be_switched")
+
+    tax = by_name.get("transfer_tax")
+    if tax is not None and tax.state == FILLED:
+        out.add("transfer_carries_a_cut")
+        if (facts.get("transfer_tax") or {}).get("setters"):
+            out.add("transfer_cut_is_movable")
+
+    limits = by_name.get("transfer_limits")
+    if limits is not None and limits.state == FILLED:
+        out.add("transfer_caps_present")
+
+    holdings = facts.get("owner_holdings") or {}
+    share = holdings.get("share_pct")
+    if share is not None and share >= 5.0:
+        # Five percent is not a judgement about the coin: it is the line the
+        # registry's own cases were decomposed against, and it is stated here
+        # rather than hidden in a threshold file.
+        out.add("owner_holds_a_large_share")
+
+    liquidity = facts.get("liquidity") or {}
+    burnt = liquidity.get("lp_burnt_pct")
+    if burnt is not None:
+        out.add("lp_mostly_parked" if burnt >= 50.0 else "lp_still_movable")
+
     return sorted(out)
 
 

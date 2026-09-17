@@ -18,6 +18,7 @@ from pathlib import Path
 
 from .. import diff as diff_mod
 from .. import render as render_mod
+from ..coin import sheet as coin_sheet
 from .. import scars as scars_mod
 from .. import util
 from ..corpus import Corpus
@@ -295,15 +296,28 @@ def build_dossier(p: util.Paths, config: dict, asset: Asset, snapshot: dict,
     if halting:
         return GateResult(dossier=None, text=None, halted=True, halting=halting)
 
-    legal, fabrications, drift, unverifiable = _legal_slots(
-        extraction, snapshot, corpus, config)
     onchain = [Slot.from_json(s) for s in
                (snapshot.get("slots") or {}).get("onchain") or []]
 
-    unreadable = unreadable_documents(snapshot, corpus)
-    challenge, challenge_dropped, challenge_fabrications = _challenge(
-        extraction, snapshot, corpus, unreadable)
-    fabrications = fabrications + challenge_fabrications
+    if asset.is_coin:
+        # Nothing was extracted, so there is nothing for the gate to intersect.
+        # The legal list stays empty rather than being filled with sixteen
+        # not_checked rows: a coin was never asked those questions, and printing
+        # them as unanswered would read as a failure to look.
+        legal: list[Slot] = []
+        fabrications: list[dict] = []
+        drift: list[dict] = []
+        unverifiable: list[dict] = []
+        unreadable: dict[str, str] = {}
+        challenge: list[dict] = []
+        challenge_dropped: list[dict] = []
+    else:
+        legal, fabrications, drift, unverifiable = _legal_slots(
+            extraction, snapshot, corpus, config)
+        unreadable = unreadable_documents(snapshot, corpus)
+        challenge, challenge_dropped, challenge_fabrications = _challenge(
+            extraction, snapshot, corpus, unreadable)
+        fabrications = fabrications + challenge_fabrications
 
     tainted = _tainted(fabrications, int(gate_config.get("taint_threshold", 3)))
 
@@ -384,13 +398,17 @@ def build_dossier(p: util.Paths, config: dict, asset: Asset, snapshot: dict,
             "unverifiable_claims": unverifiable,
             "challenge_dropped": challenge_dropped,
             "unreadable_documents": sorted(unreadable),
+            # Carried so the coin sheet can print what the contract calls
+            # itself without re-reading the snapshot from disk.
+            "facts": (snapshot.get("facts") or {}) if asset.is_coin else {},
             "documents": sources_mod.stored_documents(snapshot),
             "unavailable_documents": sources_mod.unavailable_reasons(snapshot),
         },
     )
 
     payload = dossier.to_json()
-    text = render_mod.render(dossier)
+    text = (coin_sheet.render_coin(dossier) if asset.is_coin
+            else render_mod.render(dossier))
     violations = language_mod.lint(payload, text, config)
     if violations:
         return GateResult(dossier=dossier, text=text, violations=violations,

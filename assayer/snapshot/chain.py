@@ -143,6 +143,47 @@ SIGNATURES = {
     "priceFeed()": "price_feed",
     "getPrice()": "get_price",
     "aggregator()": "aggregator",
+    # ---- surface read only under the coin profile -----------------------
+    # balances, for the owner's own share and for what sits at a dead address
+    "balanceOf(address)": "balance_of",
+    "renounceOwnership()": "renounce_ownership",
+    "transferOwnership(address)": "transfer_ownership",
+    # the switch that decides whether anybody but the deployer can transfer
+    "enableTrading()": "enable_trading",
+    "openTrading()": "open_trading",
+    "startTrading()": "start_trading",
+    "setTradingEnabled(bool)": "set_trading_enabled",
+    "tradingEnabled()": "trading_enabled",
+    "tradingActive()": "trading_active",
+    "tradingOpen()": "trading_open",
+    # a cut taken out of every transfer, and the setters that move it
+    "buyTax()": "tax_in",
+    "sellTax()": "tax_out",
+    "buyFee()": "fee_in",
+    "sellFee()": "fee_out",
+    "totalFees()": "total_fees",
+    "taxFee()": "tax_fee",
+    "_taxFee()": "tax_fee_private",
+    "setFee(uint256)": "set_fee",
+    "setFees(uint256,uint256)": "set_fees",
+    "setBuyFee(uint256)": "set_fee_in",
+    "setSellFee(uint256)": "set_fee_out",
+    "setTaxes(uint256,uint256,uint256)": "set_taxes",
+    # caps on how much one transfer or one wallet may carry
+    "maxTransactionAmount()": "max_transaction_amount",
+    "maxTxAmount()": "max_tx_amount",
+    "_maxTxAmount()": "max_tx_amount_private",
+    "maxWallet()": "max_wallet",
+    "maxWalletAmount()": "max_wallet_amount",
+    "_maxWalletSize()": "max_wallet_size",
+    "setMaxTxAmount(uint256)": "set_max_tx",
+    "setMaxWallet(uint256)": "set_max_wallet",
+    "removeLimits()": "remove_limits",
+    "cooldownEnabled()": "cooldown_enabled",
+    # the pair a coin trades in: a UniswapV2-shaped pool is itself an ERC-20
+    "token0()": "token0",
+    "token1()": "token1",
+    "getReserves()": "get_reserves",
 }
 
 SEL: dict[str, str] = {}

@@ -46,11 +46,40 @@ ONCHAIN_SLOTS: tuple[str, ...] = (
 
 ALL_SLOTS: tuple[str, ...] = LEGAL_SLOTS + ONCHAIN_SLOTS
 
+# ---------------------------------------------------------------- profiles
+
+# An asset is read under one of two profiles. The difference is not cosmetic:
+# a coin has no prospectus, no custodian and no reserve report, so the legal
+# questionnaire has nothing to be filled from and the paid phase has nothing to
+# read. A coin is therefore answered by scripts alone, and every slot below is
+# a reading of bytecode or storage.
+PROFILE_RWA = "rwa"
+PROFILE_COIN = "coin"
+PROFILES = (PROFILE_RWA, PROFILE_COIN)
+
+COIN_SLOTS: tuple[str, ...] = (
+    "ownership",
+    "mint_authority",
+    "burn_authority",
+    "pause",
+    "freeze",
+    "upgradeable",
+    "trading_switch",
+    "transfer_tax",
+    "transfer_limits",
+    "owner_holdings",
+    "burned_supply",
+    "liquidity",
+)
+
 # Slots whose values carry numbers that move on their own: a block later, a day
 # later, a mint later. Their *shape* is part of the asset's identity and of the
 # diff; their digits are not, or every clock tick would read as a change.
 VOLATILE_VALUE_SLOTS: frozenset[str] = frozenset({
     "supply_vs_reserves", "oracle", "attestation_freshness",
+    # Coin readings of the same kind. A cap and a fee are deliberately absent:
+    # those move only when somebody moves them, and that is the event.
+    "owner_holdings", "burned_supply", "liquidity",
 })
 
 # The instrument_type slot answers from a closed vocabulary. The model writes a
@@ -96,6 +125,16 @@ SLOT_QUESTIONS: dict[str, str] = {
     "oracle": "price source and staleness",
     "supply_vs_reserves": "totalSupply against the claimed collateral",
     "attestation_freshness": "age of the reserve report against the promised period",
+}
+
+COIN_SLOT_QUESTIONS: dict[str, str] = {
+    "ownership": "does the contract still answer to an owner, and what kind of key",
+    "trading_switch": "can transfers be switched on or off after deployment",
+    "transfer_tax": "does a transfer pay a fee, and who may change it",
+    "transfer_limits": "per-transaction and per-wallet caps, and who may change them",
+    "owner_holdings": "what share of supply sits in the owner's own balance",
+    "burned_supply": "what share of supply is at an address nobody holds a key to",
+    "liquidity": "how much of the token sits in the declared pool, and is the LP burnt",
 }
 
 # ---------------------------------------------------------------- states
@@ -313,6 +352,17 @@ class Asset:
     reserves: dict = field(default_factory=dict)
     alerts: dict = field(default_factory=dict)
     chain_id: int | None = None
+    # "rwa" reads documents and fills the legal questionnaire; "coin" reads the
+    # contract alone. The profile is part of the asset's identity, so it enters
+    # the snapshot hash: the same address read two ways is not one history.
+    profile: str = PROFILE_RWA
+    # The pair a coin trades in, when the holder declares one. Nothing here is
+    # discovered: a pool this file does not name is a pool the tool never reads.
+    pool: str | None = None
+
+    @property
+    def is_coin(self) -> bool:
+        return self.profile == PROFILE_COIN
 
     @property
     def name(self) -> str:
@@ -328,8 +378,10 @@ class Asset:
             "chain_id": self.chain_id,
             "address": self.address.lower(),
             "label": self.label,
+            "profile": self.profile,
             "documents": [d.to_json() for d in self.documents],
             "reserves": dict(self.reserves),
+            "pool": (self.pool.lower() if self.pool else None),
         }
 
 
@@ -424,6 +476,16 @@ def asset_from_toml(raw: dict) -> Asset:
         seen[doc_id] = url
         docs.append(Document(doc_id=doc_id, url=url, version=item.get("version")))
     chain = str(raw["chain"]).lower()
+    profile = str(raw.get("profile") or PROFILE_RWA).lower()
+    if profile not in PROFILES:
+        raise ValueError(f"unknown profile {profile!r}: expected one of "
+                         + ", ".join(PROFILES))
+    if profile == PROFILE_COIN and docs:
+        # Not a tidiness rule. A coin sheet never prints a documentary section,
+        # so a document listed here would be fetched, hashed and then silently
+        # never cited: the file is refused instead of half honoured.
+        raise ValueError("a coin profile carries no documents; remove them or "
+                         'set profile = "rwa"')
     return Asset(
         chain=chain,
         address=str(raw["address"]).lower(),
@@ -432,6 +494,8 @@ def asset_from_toml(raw: dict) -> Asset:
         reserves=dict(raw.get("reserves", {}) or {}),
         alerts=dict(raw.get("alerts", {}) or {}),
         chain_id=raw.get("chain_id") or CHAIN_IDS.get(chain),
+        profile=profile,
+        pool=(str(raw["pool"]).lower() if raw.get("pool") else None),
     )
 
 
@@ -458,9 +522,29 @@ def asset_to_toml(asset: Asset) -> str:
         f"label = {_toml_str(asset.label)}",
         f"chain = {_toml_str(asset.chain)}",
         f"address = {_toml_str(asset.address)}",
+        f"profile = {_toml_str(asset.profile)}",
     ]
     if asset.chain_id:
         lines.append(f"chain_id = {asset.chain_id}")
+    if asset.is_coin:
+        lines += [
+            "",
+            "# The pair this coin trades in. Nothing is discovered: without this",
+            "# line the liquidity slot reads not_checked rather than guessing.",
+            (f"pool = {_toml_str(asset.pool)}" if asset.pool
+             else '# pool = "0x…"'),
+            "",
+            "# Your numbers, not a judgement by the tool.",
+            "# [alerts]",
+            "# require_renounced_ownership = true",
+            "# require_no_freeze = true",
+            "# require_no_transfer_tax = true",
+            "# require_no_trading_switch = true",
+            "# max_owner_share_pct = 5.0",
+            "# min_burnt_lp_pct = 95.0",
+            "",
+        ]
+        return "\n".join(lines)
     for doc in asset.documents:
         lines += ["", "[[documents]]",
                   f"doc_id = {_toml_str(doc.doc_id)}",

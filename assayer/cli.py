@@ -92,18 +92,29 @@ def cmd_add(args) -> int:
         if any(d.doc_id == doc_id for d in documents):
             doc_id = f"{doc_id}-{len(documents) + 1}"
         documents.append(Document(doc_id=doc_id, url=url))
+    profile = model.PROFILE_COIN if args.coin else model.PROFILE_RWA
+    if profile == model.PROFILE_COIN and documents:
+        out("a coin profile carries no documents: it is read from the contract "
+            "alone. Drop --docs, or register it without --coin.")
+        return USAGE
     asset = Asset(chain=chain, address=address,
                   label=args.label or f"{chain}:{address[:10]}",
                   documents=documents,
-                  chain_id=model.CHAIN_IDS.get(chain))
+                  chain_id=model.CHAIN_IDS.get(chain),
+                  profile=profile, pool=args.pool)
     target = p.assets / f"{asset.name}.toml"
     if target.exists() and not args.force:
         out(f"asset already registered: {target}")
         return ERROR
     util.atomic_write_text(target, model.asset_to_toml(asset))
-    out(f"registered {asset.ref}  ->  {target}")
+    out(f"registered {asset.ref} as {asset.profile}  ->  {target}")
     for doc in documents:
         out(f"  {doc.doc_id}: {doc.url}")
+    if asset.is_coin and not asset.pool:
+        out("")
+        out("no pool declared: the liquidity slot will read not_checked. "
+            "Pools are never discovered; add --pool <pair address> or write "
+            "a pool line into the asset file.")
     allowed = list((util.load_config(p).get("sources") or {})
                    .get("allowed_domains") or [])
     missing = sorted({docs_mod.host_of(d.url) for d in documents
@@ -202,6 +213,14 @@ def cmd_extract(args) -> int:
     except (FileNotFoundError, ValueError) as exc:
         out(str(exc))
         return ERROR
+    if asset.is_coin:
+        # Not a limitation to work around. There is no corpus to read, so a
+        # model here would be asked to answer from nothing, and answering from
+        # nothing is exactly what the gate downstream exists to catch.
+        out(f"{asset.name} is a coin: it carries no documents, so there is "
+            f"nothing to extract and nothing to spend.")
+        out("assayer snap fills every slot this profile has.")
+        return NOTHING_TO_DO
     snapshots = build_mod.list_snapshots(p, asset)
     if not snapshots:
         out("take a snapshot first: assayer snap " + asset.name)
@@ -777,6 +796,11 @@ def build_parser() -> argparse.ArgumentParser:
     add.add_argument("--docs", nargs="*", default=[],
                      help="url or doc_id=url, repeatable")
     add.add_argument("--label")
+    add.add_argument("--coin", action="store_true",
+                     help="a coin with no documents: read from the contract "
+                          "alone, no model, nothing to spend")
+    add.add_argument("--pool", help="the pair a coin trades in; without it the "
+                                    "liquidity slot reads not_checked")
     add.add_argument("--force", action="store_true")
     add.set_defaults(func=cmd_add)
 

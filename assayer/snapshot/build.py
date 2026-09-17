@@ -28,9 +28,11 @@ from typing import Any, Iterable
 from .. import util
 from ..corpus import Corpus
 from ..model import (
-    ONCHAIN_SLOTS, SCHEMA_VERSION, VOLATILE_VALUE_SLOTS, Asset, Slot, not_checked,
+    COIN_SLOTS, ONCHAIN_SLOTS, SCHEMA_VERSION, VOLATILE_VALUE_SLOTS, Asset, Slot,
+    not_checked,
 )
 from ..verify import injection as injection_mod
+from .. import coin as coin_mod
 from . import chain as chain_mod
 from . import docs as docs_mod
 from . import reserves as reserves_mod
@@ -38,7 +40,13 @@ from . import reserves as reserves_mod
 # Facts that change without anyone deciding anything. The reserve readings are
 # derived from a supply that moves and a report that ages; the meaningful shape
 # of both already reaches the hash through the digit-folded slot values.
-VOLATILE_FACTS = frozenset({"total_supply", "selectors_seen", "reserves"})
+VOLATILE_FACTS = frozenset({"total_supply", "selectors_seen", "reserves",
+                            # Coin readings that move without anyone deciding
+                            # anything: a balance, a pool, a share of supply.
+                            # Their shape reaches the hash through the slot
+                            # values, and their digits are watched by the
+                            # thresholds in the asset file instead.
+                            "owner_holdings", "burned_supply", "liquidity"})
 
 _DIGITS = re.compile(r"\d[\d,._ ]*")
 
@@ -115,7 +123,47 @@ def compute_alerts(asset: Asset, facts: dict, slots: list[Slot]) -> list[dict]:
                 f"threshold is {limit}%"
                 + (" (threshold crossed)" if over > limit else ""))
 
+    # ---- coin thresholds -------------------------------------------------
+    # Same contract as above: the holder's number, the reading beside it, and an
+    # explicit "not applied" whenever the reading is missing. A threshold that
+    # could not be evaluated is never reported as satisfied.
+    if "max_owner_share_pct" in declared:
+        limit = float(declared["max_owner_share_pct"])
+        share = (facts.get("owner_holdings") or {}).get("share_pct")
+        if share is None:
+            add("max_owner_share_pct", limit, None, False,
+                "the owner balance was not read, threshold not applied")
+        else:
+            add("max_owner_share_pct", limit, share, share > limit,
+                f"the owner address holds {share}% of supply, threshold is "
+                f"{limit}%"
+                + (" (threshold crossed)" if share > limit else ""))
+
+    if "min_burnt_lp_pct" in declared:
+        limit = float(declared["min_burnt_lp_pct"])
+        burnt = (facts.get("liquidity") or {}).get("lp_burnt_pct")
+        if burnt is None:
+            add("min_burnt_lp_pct", limit, None, False,
+                "the pool's LP token was not read, threshold not applied")
+        else:
+            add("min_burnt_lp_pct", limit, burnt, burnt < limit,
+                f"{burnt}% of the pool's LP sits at an address with no known "
+                f"key, minimum set to {limit}%"
+                + (" (threshold crossed)" if burnt < limit else ""))
+
     checks = (
+        ("require_renounced_ownership", "ownership",
+         "the contract still answers to a live owner",
+         "the owner position is given up"),
+        ("require_no_trading_switch", "trading_switch",
+         "transfers can be switched on or off after deployment",
+         "no function turns transfers on or off"),
+        ("require_no_transfer_tax", "transfer_tax",
+         "a cut is taken on transfer",
+         "no fee function in the code"),
+        ("require_no_transfer_limits", "transfer_limits",
+         "a per-transaction or per-wallet cap is kept",
+         "no cap on how much one transfer or one wallet may carry"),
         ("require_no_freeze", "freeze",
          "the issuer has an address-freeze function",
          "no address-freeze function in the code"),
@@ -134,7 +182,11 @@ def compute_alerts(asset: Asset, facts: dict, slots: list[Slot]) -> list[dict]:
             add(key, True, None, False,
                 f"{slot_name} was not read, threshold not applied")
             continue
-        if key == "require_no_foreign_burn":
+        if key in ("require_no_foreign_burn", "require_renounced_ownership",
+                   "require_no_trading_switch"):
+            # For these three the mere presence of a function is not the event:
+            # an owner that was given up, a flag with no setter and a burn that
+            # only touches the caller's own balance all read as filled.
             present = slot.state == "filled" and slot.material
         else:
             present = slot.state == "filled"
@@ -197,7 +249,11 @@ def compute_docs_hash(documents: Iterable[dict]) -> str:
 def compute_snapshot_hash(docs_hash: str, slots: Iterable[Slot], facts: dict,
                           asset: Asset) -> str:
     identity = {
-        "asset": {"chain": asset.chain, "address": asset.address},
+        # The profile is part of the identity: the same address read as a coin
+        # and read as a security is not one history, and a snapshot taken under
+        # one must never look unchanged to the other.
+        "asset": {"chain": asset.chain, "address": asset.address,
+                  "profile": asset.profile},
         "docs_hash": docs_hash,
         "slots": sorted((_hash_view(s) for s in slots),
                         key=lambda v: str(v["slot"])),
@@ -247,10 +303,18 @@ def build(p: util.Paths, config: dict, asset: Asset, *,
     if fetcher is None:
         fetcher = docs_mod.UrllibFetcher(allowed, max_bytes)
 
-    report = chain_mod.read_chain(config, asset.chain, asset.address,
-                                  chain_id=asset.chain_id, rpc=rpc)
-    doc_results = docs_mod.collect(asset.documents, fetcher=fetcher,
-                                   corpus=corpus, allowed=allowed)
+    if asset.is_coin:
+        # No documents, so no fetching, no corpus and no injection surface: a
+        # coin profile touches the network only through the read-only RPC.
+        report = coin_mod.read_coin(config, asset.chain, asset.address,
+                                    chain_id=asset.chain_id, pool=asset.pool,
+                                    rpc=rpc)
+        doc_results = []
+    else:
+        report = chain_mod.read_chain(config, asset.chain, asset.address,
+                                      chain_id=asset.chain_id, rpc=rpc)
+        doc_results = docs_mod.collect(asset.documents, fetcher=fetcher,
+                                       corpus=corpus, allowed=allowed)
 
     patterns = injection_mod.flatten_patterns(
         (config.get("gate") or {}).get("injection_patterns"))
@@ -267,19 +331,21 @@ def build(p: util.Paths, config: dict, asset: Asset, *,
         suggested += docs_mod.harvest_links(doc, result.doc_id, allowed)
 
     onchain_slots = list(report.slots)
-    reserve_slots, reserve_facts = reserves_mod.read_reserves(
-        asset, report.facts, doc_results, corpus, report.chain_id, report.block,
-        now)
-    onchain_slots += reserve_slots
-    if reserve_facts:
-        report.facts["reserves"] = reserve_facts
+    if not asset.is_coin:
+        reserve_slots, reserve_facts = reserves_mod.read_reserves(
+            asset, report.facts, doc_results, corpus, report.chain_id,
+            report.block, now)
+        onchain_slots += reserve_slots
+        if reserve_facts:
+            report.facts["reserves"] = reserve_facts
+    vocabulary = COIN_SLOTS if asset.is_coin else ONCHAIN_SLOTS
     known = {s.slot for s in onchain_slots}
-    for name in ONCHAIN_SLOTS:
+    for name in vocabulary:
         if name not in known:
             onchain_slots.append(not_checked(name, "slot_not_produced",
                                             "no reader produced this slot"))
-    onchain_slots.sort(key=lambda s: ONCHAIN_SLOTS.index(s.slot)
-                       if s.slot in ONCHAIN_SLOTS else 99)
+    onchain_slots.sort(key=lambda s: vocabulary.index(s.slot)
+                       if s.slot in vocabulary else 99)
 
     documents = [r.to_json() for r in doc_results]
     docs_hash = compute_docs_hash(documents)

@@ -100,6 +100,7 @@ class FakeRpc:
     code: dict[str, bytes] = field(default_factory=dict)
     storage: dict[tuple[str, str], str] = field(default_factory=dict)
     calls: dict[tuple[str, str], str] = field(default_factory=dict)
+    balances: dict[tuple[str, str], int] = field(default_factory=dict)
     timestamp: int = 1_800_000_000
     fail_on: set[str] = field(default_factory=set)
     seen: list[tuple[str, list]] = field(default_factory=list)
@@ -124,6 +125,12 @@ class FakeRpc:
         if method == "eth_call":
             to = str(params[0].get("to", "")).lower()
             data = str(params[0].get("data", ""))
+            if data[:10] == chain_mod.SEL["balance_of"] and len(data) >= 74:
+                # balanceOf takes an argument, so unlike every other call here
+                # the answer depends on it: the holder is decoded rather than
+                # collapsed into one reply per token.
+                holder = "0x" + data[-40:].lower()
+                return "0x" + format(self.balances.get((to, holder), 0), "064x")
             return self.calls.get((to, data[:10]), "0x")
         raise chain_mod.RpcError(f"unexpected method {method}")
 
@@ -137,6 +144,9 @@ class FakeRpc:
     def set_address(self, address: str, signature: str, value: str) -> None:
         self.set_call(address, signature,
                       "0x" + "0" * 24 + value.lower().replace("0x", ""))
+
+    def set_balance(self, token: str, holder: str, value: int) -> None:
+        self.balances[(token.lower(), holder.lower())] = value
 
     def set_storage(self, address: str, slot: str, value_address: str) -> None:
         self.storage[(address.lower(), slot.lower())] = \

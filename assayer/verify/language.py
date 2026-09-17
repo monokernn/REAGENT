@@ -18,8 +18,10 @@ from typing import Iterable
 
 from .. import util
 from ..model import NOT_CHECKED, NOT_FOUND, REJECTED
+from ..model import PROFILE_COIN
 from ..render import (
-    H_NOT_CHECKED, H_NOT_FOUND, H_POWERS, H_REJECTED, SECTION_HEADERS,
+    H_NOT_CHECKED, H_NOT_FOUND, H_POWERS, H_POWERS_COIN, H_REJECTED,
+    SECTION_HEADERS,
 )
 
 # Keys whose values are somebody else's words, not the tool's.
@@ -153,6 +155,12 @@ def check_sections(dossier: dict, rendered: str) -> list[Violation]:
     mentions = {header: _slots_mentioned(lines) for header, lines in sections.items()}
 
     slots = (dossier.get("slots") or {})
+    # The two profiles print their powers under different headers, and the rule
+    # being enforced is the same one either way: an absent power belongs beside
+    # the powers, never beside the things this tool failed to read.
+    powers_header = (H_POWERS_COIN
+                     if str((dossier.get("asset") or {}).get("profile")
+                            or "") == PROFILE_COIN else H_POWERS)
     expected: dict[str, str] = {}
     for group in ("legal", "onchain"):
         for slot in slots.get(group) or []:
@@ -163,7 +171,8 @@ def check_sections(dossier: dict, rendered: str) -> list[Violation]:
             elif state == REJECTED:
                 expected[name] = H_REJECTED
             elif state == NOT_FOUND:
-                expected[name] = H_NOT_FOUND if group == "legal" else H_POWERS
+                expected[name] = (H_NOT_FOUND if group == "legal"
+                                  else powers_header)
 
     for name, header in expected.items():
         present_in = [h for h, found in mentions.items() if name in found]
@@ -172,7 +181,8 @@ def check_sections(dossier: dict, rendered: str) -> list[Violation]:
                                  f"expected under «{header}», not printed there"))
         for other in present_in:
             if other != header and other in (H_NOT_FOUND, H_NOT_CHECKED,
-                                             H_REJECTED, H_POWERS):
+                                             H_REJECTED, H_POWERS,
+                                             H_POWERS_COIN):
                 out.append(Violation(
                     "sections", name,
                     f"printed under «{other}» but its state belongs "
