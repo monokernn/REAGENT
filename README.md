@@ -1,25 +1,90 @@
 # REAGENT (RWA Evidence Agent)
 
-![tests](https://img.shields.io/badge/tests-114%20passing-2ea44f)
+![tests](https://img.shields.io/badge/tests-119%20passing-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
-**REAGENT (RWA Evidence Agent)** turns a contract address into one readable
-sheet, and it works in two profiles.
+**REAGENT (RWA Evidence Agent)** reads a token and writes one sheet on which
+every line names the function, the block or the page it came from.
 
-**A coin.** The default. Give it an address and it reads the deployed bytecode
-and storage: whether supply can still grow, whether an address can be blocked,
-whether transfers can be switched off after launch, what a transfer pays, what
-a wallet may hold, how much of the supply sits in the owner's own balance, and
-how much of the declared pool's LP is parked where nobody can move it. No
-documents, no model, nothing to spend.
+The work is divided among a crew of agents. Each owns one question, is handed
+only the evidence that bears on it, and answers from that alone. They do not
+talk to each other: a snapshot is collected once, by scripts, and given to all of
+them at the same moment, so two readings cannot rest on two different
+observations of the same contract.
 
-**An asset with documents.** The profile the tool started as. Give it the
-issuer's documents too and a set of bounded roles fills a fixed legal
-questionnaire with quoted evidence, for tokenised real-world assets — Robinhood
-Stock Tokens among them.
+One agent is handed a model. The rest read bytecode and storage, hash documents,
+intersect claims against the bytes they cite, and delete what does not hold.
 
 ![REAGENT — RWA Evidence Agent](media/banner1.gif)
+
+---
+
+## The crew
+
+Eight agents. The roster is in [`assayer/crew.py`](assayer/crew.py), and
+`tests/test_crew.py` holds it to the program: every reading the tool produces is
+owned by exactly one agent, and a slot added without an owner fails the suite.
+
+| agent | beat | asks | the readings it owns |
+|---|---|---|---|
+| **Slate** | identity and origin | Is this a deployed token on this chain, and what does it call itself? | the name, symbol, decimals and supply the contract answers with |
+| **Clasp** | contract powers | What does the deployed code still permit somebody to do to your balance? | `ownership`, `mint_authority`, `burn_authority`, `pause`, `freeze`, `upgradeable`, `trading_switch`, `transfer_tax`, `transfer_limits` |
+| **Gauge** | liquidity and exits | How deep is the pool you would have to leave through, and can its LP still be moved? | `liquidity` |
+| **Tare** | supply and burn | Where does the supply sit, and how much of it can nobody move? | `burned_supply`, `supply_vs_reserves` |
+| **Sift** | holders and control | How much of the supply sits with whoever still holds the keys? | `owner_holdings` |
+| **Pulse** | price and attestation | What price source does the contract read, and how old is the reserve report? | `oracle`, `attestation_freshness` |
+| **Docket** | documents and RWA | What do the issuer's own documents say, and does every quote survive the gate? | `instrument_type`, `issuer`, `holder_rights`, `insolvency`, `custodian`, `corporate_actions`, `redemption`, `restrictions` |
+| **Crucible** | the whole picture | Puts the others together, adding nothing they did not find. | none of its own |
+
+Docket is the one agent handed a model, and the one that cannot run in a browser:
+it needs the issuer's files and the gate that checks every quote against the
+bytes it cites.
+
+What Docket may do is propose a claim. Marking that claim verified, writing into
+`dossier.json`, and deciding that a document it failed to read says nothing are
+other work, done by deterministic code, which is why those answers are the same
+every time and can be re-run for free.
+
+A memecoin has no prospectus, so Docket has nothing to read and is never started.
+The sheet is then written entirely by agents that cost nothing, and a test holds
+that: no agent that calls a model owns a coin reading.
+
+## The rule underneath it
+
+One observation, from which the architecture follows:
+
+> Extraction is expensive and untrusted. Verification is cheap and trusted.
+> Therefore they must not be the same operation.
+
+Work is handed over through three artefact types on disk, each addressed by its
+content:
+
+| artefact | produced by | cost | trust |
+|---|---|---|---|
+| **snapshot** | scripts: on-chain readers and document fetches | ~0 | trusted, reproducible |
+| **extraction** | a model, reading the documents in a snapshot | money | **untrusted** |
+| **dossier** | the verifier: extraction intersected with snapshot | ~0 | trusted |
+
+Four properties fall out of the separation for free.
+
+**Reproducibility.** `dossier = f(snapshot, extraction)` is a pure function. A
+dossier carries no wall-clock stamp of when it was produced; its date comes from
+the snapshot. Two runs over the same inputs produce a byte-identical
+`dossier.json`, and a test holds that.
+
+**Free re-verification.** Improve the rules of the gate, then run them over the
+whole archive of old extractions without a single model call:
+`assayer verify --all`.
+
+**Drift as the base case, not a feature.** Snapshots are structured and
+content-addressed, so "what changed" is not a subsystem. It is subtraction.
+
+**Separate budgets.** Observation costs nothing and can run every hour. You pay
+only when a snapshot has actually changed.
+
+The product is not "a model reads a prospectus". It is tamper-evident
+surveillance of drift, with every statement traceable to the bytes it came from.
 
 ## Two profiles, one machine
 
@@ -27,70 +92,24 @@ Stock Tokens among them.
 |---|---|---|
 | what it reads | the contract | the contract **and** the issuer's documents |
 | slots | 12, all from bytecode and storage | 8 legal + 8 on-chain |
+| the crew | seven agents | all eight |
 | the model | never called | called once per changed snapshot |
 | cost | $0.00, always | ~$0.10–0.40 per extraction |
 | the gate | nothing to intersect: no claim was proposed | quotes, injections, provenance, language |
 | catches | a power that is still live, a pool whose LP is still movable | a prospectus that says something the interface does not |
 
-The second half of this file is about the documents profile. Everything below
-`The idea` applies to it; the coin profile is described in
-[Ordinary coins](#ordinary-coins).
-
-The roles do not operate as isolated chatbots. They work from the same
-content-addressed workspace and hand off immutable artefacts:
-
-| role | responsibility |
-|---|---|
-| **Source Snapshot** | fetch and hash the allowed issuer documents |
-| **Contract Scan** | read the token's on-chain powers and relevant state |
-| **Claim Extraction** | fill a fixed legal questionnaire with quoted evidence |
-| **Source Verification** | check every proposed claim against canonical bytes |
-| **Evidence Dossier** | assemble accepted findings and preserve every rejection |
-
-Only **Claim Extraction** invokes a model. The other roles are deterministic
-programs: they collect, check, reject and render. The model may propose a claim,
-but it cannot approve its own work or write directly into the final dossier.
-This repository is the execution layer for that workflow: shared state,
-handoffs, evidence rules, spending limits and the final gate live here.
-
-It answers four questions:
+Both profiles answer the same four questions:
 
 - what you hold legally,
 - what the issuer can do to your balance technically,
 - what changed since the last check,
 - which piece of evidence each statement rests on.
 
-A blockchain keeps an honest record of the token. It keeps no record of the
-existence or the status of the real asset: that lives in the issuer's prospectus,
-in the custodian's statement, in the jurisdiction of incorporation, and in the
-powers the issuer kept for itself inside the contract. The holder sees a company
-name and a chart. The prospectus may say this is a debt note of an offshore
-issuer carrying no shareholder rights, and the contract may say the issuer can
-freeze any address and replace the logic with no delay. All of it is public, and
-none of it gets read: the documents are long, the contracts are unreadable by
-eye, and both change quietly. REAGENT works in that gap.
-
 Locally. No private keys, no transactions, no opinion about what you should do.
 The tool produces a document; the person decides.
 
-> A *reagent* is what an assay office puts a sample through to find out what
-> the metal is actually made of. Hence the name.
-
-![assayer in a terminal](media/demo.gif)
-
-*A real session, rendered frame by frame: the documents come over HTTP from a
-local server, the on-chain slots over JSON-RPC from a local stub, and between the
-two snapshots the prospectus really is replaced behind the tool's back. Only the
-issuer is fictional. Nothing here costs a token: `extract` is not even available,
-since no agent CLI is installed.*
-
-**A live illustration of the gap.** Robinhood Stock Tokens: the interface shows
-the ticker and the price of a familiar company, while the prospectus describes
-tokenised debt securities of an issuer incorporated in Jersey. They give economic
-exposure to the price of the underlying share, but they do not make the holder a
-shareholder and carry no shareholder rights. This is not an assessment of the
-company or of the instrument. It is an illustration that the interface and the
-document say different things, and that nobody reads the second one.
+> A *reagent* is what an assay office puts a sample through to find out what the
+> metal is actually made of. Hence the name.
 
 ---
 
@@ -98,9 +117,9 @@ document say different things, and that nobody reads the second one.
 
 | section | what is in it |
 |---|---|
+| [The crew](#the-crew) | eight agents, and which readings each one owns |
 | [Ordinary coins](#ordinary-coins) | the default profile: twelve readings, no documents, no model |
-| [The idea](#the-idea) | five bounded roles, three artefacts, one shared workspace |
-| [Example dossier](#example-dossier) | the actual output, in full |
+| [Assets with documents](#assets-with-documents) | the gap this was built for, and a dossier in full |
 | [Start](#start) | install, configure, first snapshot |
 | [How it works](#how-it-works) | snapshot, extract, verify |
 | [The gate](#the-gate) | how fabrications and injections are caught |
@@ -115,8 +134,8 @@ document say different things, and that nobody reads the second one.
 ## Ordinary coins
 
 A memecoin has no prospectus, no custodian and no reserve report. The legal
-questionnaire therefore has nothing to be filled from, and the paid phase has
-nothing to read — so it is not called. Everything a holder can be told about one
+questionnaire therefore has nothing to be filled from, and the paid role has
+nothing to read — so it is not started. Everything a holder can be told about one
 is a fact about bytecode and storage, and the coin profile reads it with scripts.
 
 ```bash
@@ -148,7 +167,8 @@ pair for *this* token before a single number from it is believed.
 | `liquidity` | how much of the token is in the declared pool, and how much of that pool's LP is parked |
 
 Six of them are the documents profile's own power slots, reused rather than
-reimplemented: the same questions about the same bytecode.
+reimplemented: Clasp asks the same questions of the same bytecode whichever
+profile called it.
 
 ### What the sheet looks like
 
@@ -184,7 +204,6 @@ COMPLETENESS: 8/12 slots   POWERS LIVE: 5   SPENT: $0.0000
 snapshot 87f45d9533ed  ·  no extraction: this profile calls no model  ·  block 21000000
 This sheet shows what the contract records. The person decides.
 ```
-
 There is no score and no verdict, for the same reason as everywhere else in this
 tool. `POWERS LIVE: 5` is a count of readings, not a number that means anything
 on its own: five live powers on a coin whose pool is parked and five on one whose
@@ -234,45 +253,37 @@ and the holder would learn to ignore it.
 
 ---
 
-## The idea
+## Assets with documents
 
-One observation, from which everything else follows:
+This is the profile the tool started as, and the gap it was built for.
 
-> Extraction is expensive and untrusted. Verification is cheap and trusted.
-> Therefore they must not be the same operation.
+A blockchain keeps an honest record of the token. It keeps no record of the
+existence or the status of the real asset: that lives in the issuer's prospectus,
+in the custodian's statement, in the jurisdiction of incorporation, and in the
+powers the issuer kept for itself inside the contract. The holder sees a company
+name and a chart. The prospectus may say this is a debt note of an offshore
+issuer carrying no shareholder rights, and the contract may say the issuer can
+freeze any address and replace the logic with no delay. All of it is public, and
+none of it gets read: the documents are long, the contracts are unreadable by
+eye, and both change quietly. REAGENT works in that gap.
 
-The five roles hand work over through three separate artefact types on disk,
-each addressed by its content:
+**A live illustration.** Robinhood Stock Tokens: the interface shows the ticker
+and the price of a familiar company, while the prospectus describes tokenised
+debt securities of an issuer incorporated in Jersey. They give economic exposure
+to the price of the underlying share, but they do not make the holder a
+shareholder and carry no shareholder rights. This is not an assessment of the
+company or of the instrument. It is an illustration that the interface and the
+document say different things, and that nobody reads the second one.
 
-| artefact | produced by | cost | trust |
-|---|---|---|---|
-| **snapshot** | scripts: on-chain readers and document fetches | ~0 | trusted, reproducible |
-| **extraction** | a model, reading the documents in a snapshot | money | **untrusted** |
-| **dossier** | the verifier: extraction intersected with snapshot | ~0 | trusted |
+![assayer in a terminal](media/demo.gif)
 
-Four properties fall out of the separation for free.
+*A real session, rendered frame by frame: the documents come over HTTP from a
+local server, the on-chain slots over JSON-RPC from a local stub, and between the
+two snapshots the prospectus really is replaced behind the tool's back. Only the
+issuer is fictional. Nothing here costs a token: `extract` is not even available,
+since no agent CLI is installed.*
 
-**Reproducibility.** `dossier = f(snapshot, extraction)` is a pure function. A
-dossier carries no wall-clock stamp of when it was produced; its date comes from
-the snapshot. Two runs over the same inputs produce a byte-identical
-`dossier.json`, and a test holds that.
-
-**Free re-verification.** Improve the rules of the gate, then run them over the
-whole archive of old extractions without a single model call:
-`assayer verify --all`.
-
-**Drift as the base case, not a feature.** Snapshots are structured and
-content-addressed, so "what changed" is not a subsystem. It is subtraction.
-
-**Separate budgets.** Observation costs nothing and can run every hour. You pay
-only when a snapshot has actually changed.
-
-The product here is not "AI reads a prospectus". It is tamper-evident
-surveillance of drift, with every claim traceable to the bytes it came from.
-
----
-
-## Example dossier
+### Example dossier
 
 ```
 ASSAY  ·  Assay Note ASSY  ·  ethereum:0x1111111111111111111111111111111111111111  ·  2026-02-11
@@ -359,14 +370,13 @@ COMPLETENESS: 12/16 slots   FABRICATIONS: 1   INJECTIONS: 0   SPENT: $0.1873
 snapshot 0f0dffc3cbc5  ·  extraction d7a8561316ac  ·  block 21345678
 This sheet shows what the sources say and what the contract records. The person decides.
 ```
-
 ### Three sections that never merge
 
 | section | what it is a fact about |
 |---|---|
 | `NOT FOUND IN THE DOCUMENTS` | **the asset.** We looked; the documents do not say it. |
 | `NOT CHECKED` | **the tool.** It failed to look, and here is the reason. |
-| `REJECTED BY THE GATE` | **the model.** It made a claim and the evidence did not hold. |
+| `REJECTED BY THE GATE` | **Docket.** It made a claim and the evidence did not hold. |
 
 A blocking linter enforces the separation, not the author's care. Collapsing the
 first two would turn an outage at an RPC provider into a statement that the issuer
@@ -490,9 +500,13 @@ moved.
 
 ## How it works
 
+Three phases. Two are free, one is not, and the expensive one sits between two
+that check it.
+
 ### snapshot: zero tokens
 
-A fully deterministic phase. Eight on-chain slots are read by scripts alone:
+Scripts only, fully deterministic. Eight on-chain slots are read and handed to
+the agents that own them — five to Clasp, two to Pulse, one to Tare:
 
 | slot | what is read |
 |---|---|
@@ -515,13 +529,13 @@ look like a change, and "pay only for drift" would decay into "pay always".
 
 ### extract: the only phase that costs money
 
-The model receives the canonical texts and a fixed questionnaire of eight legal
-slots: instrument type, issuer, holder rights, insolvency, custodian, corporate
-actions, redemption, restrictions. No open questions are asked, because an open
-question produces prose that cannot be diffed against the same question next
-month.
+Docket, and the only point in the system where a model is used. It receives the
+canonical texts and a fixed questionnaire of eight legal slots: instrument type,
+issuer, holder rights, insolvency, custodian, corporate actions, redemption,
+restrictions. No open questions are asked, because an open question produces
+prose that cannot be diffed against the same question next month.
 
-Rules the phase enforces:
+Rules Docket works under:
 
 - the answer is JSON only, no prose;
 - every filled slot carries a doc_id, the document's sha256 and a verbatim quote;
@@ -529,10 +543,15 @@ Rules the phase enforces:
 - invalid JSON gets one retry, after which slots are marked `not_checked`;
 - if `snapshot_hash` has not changed, the phase refuses to spend anything.
 
+It is one call per changed snapshot, not one per slot: eight calls would cost
+eight times as much to answer the same questionnaire, and would let two slots
+disagree about the same sentence.
+
 ### verify: the gate
 
-Deterministic code, zero model calls. Output is `dossier.json` and `dossier.txt`.
-It can be re-run over existing extractions as often as you like.
+Deterministic code, zero model calls: every claim Docket proposed is intersected
+with the bytes it cited, and what survives is assembled into `dossier.json` and
+`dossier.txt`. It can be re-run over existing extractions as often as you like.
 
 ---
 
@@ -645,6 +664,7 @@ ones you already paid to read.
 
 | situation | cost |
 |---|---|
+| anything on a coin, forever | $0.00 |
 | `snap`, `watch`, `verify`, `show`, `diff`, `evidence` | $0.00 |
 | one extraction over two documents | roughly $0.10 to $0.40 |
 | any number of runs while the documents are unchanged | $0.00 |
@@ -667,8 +687,9 @@ and safe against concurrent writers.
 - `pypdf` for PDFs, and `tomli` on 3.10; both install with the package
 - any agent CLI on PATH, optional
 
-The agent CLI is declared in `config.toml`. Anything that accepts a prompt and
-returns JSON will do: change the command, the args and two field names.
+The model is not wired to a vendor. Docket shells out to whatever agent CLI is
+declared in `config.toml`, on your own key: anything that accepts a prompt and
+returns JSON will do, and swapping it is a change of four lines.
 
 ```toml
 [agent]
@@ -678,8 +699,9 @@ response_field = "result"
 cost_field = "total_cost_usd"
 ```
 
-With no CLI installed, `snap`, `verify`, `diff`, `show` and `watch` work in full,
-and `extract` reports itself unavailable and returns code 6.
+With no CLI installed the coin profile works in full, `snap`, `verify`, `diff`,
+`show` and `watch` work in full, and `extract` reports itself unavailable and
+returns code 6.
 
 ---
 
@@ -713,7 +735,7 @@ reported as a change while a changed fee is.
 The rest came out of building it: `test_drift.py` on the quality of the diff,
 `test_scans.py` on a document with no text layer, `test_alerts.py` on thresholds,
 `test_challenge.py` on the adversarial mandate, `test_scars_registry.py` on the
-registry, and `test_extract.py`, where the paid phase runs through a real
+registry, and `test_extract.py`, where the paid role runs through a real
 subprocess with a stand-in agent CLI.
 
 **Held by a blocking test:** a grep of the sources for the absence of signing and

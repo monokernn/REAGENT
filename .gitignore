@@ -43,3 +43,11 @@ htmlcov/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Credentials. The service account signs requests to Vertex on this project's
+# billing, and .env carries the fallback API key: neither belongs in a repo,
+# and neither is needed to read a contract.
+.env
+.env.*
+!.env.example
+secrets/
