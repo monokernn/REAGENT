@@ -1,6 +1,6 @@
 # REAGENT (RWA Evidence Agent)
 
-![tests](https://img.shields.io/badge/tests-119%20passing-2ea44f)
+![tests](https://img.shields.io/badge/tests-136%20passing-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
@@ -46,9 +46,14 @@ What Docket may do is propose a claim. Marking that claim verified, writing into
 other work, done by deterministic code, which is why those answers are the same
 every time and can be re-run for free.
 
-A memecoin has no prospectus, so Docket has nothing to read and is never started.
-The sheet is then written entirely by agents that cost nothing, and a test holds
-that: no agent that calls a model owns a coin reading.
+A memecoin has no prospectus, so Docket has nothing to read and is never
+started. Every reading on a coin sheet is therefore free, and a test holds it:
+no agent whose answers come from a model owns a coin reading.
+
+Prose is a separate thing from a reading, and the roster says so separately.
+Slate, Clasp, Gauge, Tare and Sift can each write a sentence about what they
+read, through `assayer notes` — but the reading itself is still bytecode, and
+the sheet prints in full without ever asking for one.
 
 ## The rule underneath it
 
@@ -93,8 +98,8 @@ surveillance of drift, with every statement traceable to the bytes it came from.
 | what it reads | the contract | the contract **and** the issuer's documents |
 | slots | 12, all from bytecode and storage | 8 legal + 8 on-chain |
 | the crew | seven agents | all eight |
-| the model | never called | called once per changed snapshot |
-| cost | $0.00, always | ~$0.10–0.40 per extraction |
+| the model | never for a reading; notes are opt-in | once per changed snapshot |
+| cost | $0.00 for the sheet | ~$0.10–0.40 per extraction |
 | the gate | nothing to intersect: no claim was proposed | quotes, injections, provenance, language |
 | catches | a power that is still live, a pool whose LP is still movable | a prospectus that says something the interface does not |
 
@@ -250,6 +255,53 @@ changed*.
 
 If a drifting balance flipped the hash, `watch` would cry drift on every block
 and the holder would learn to ignore it.
+
+### Notes, if you want sentences
+
+The sheet is twelve readings and no prose. `assayer notes` adds the prose, and
+it is the one coin command that can cost anything:
+
+```bash
+assayer notes robinhood-0xaddress     # calls the agent CLI named in config.toml
+assayer show robinhood-0xaddress --notes   # prints what was already written, free
+```
+
+The writing goes through the same agent CLI the documents profile uses, on your
+own key. No vendor is wired in, and the readings never depend on it.
+
+Three things keep the sentences from becoming a second, softer source of truth.
+
+**They are addressed by the snapshot they describe.** Ask twice about a contract
+that has not moved and the second answer is the file, not a call.
+
+**Every figure must already be on the sheet.** A sentence may only use a number
+or an address the readings produced, allowing for a percentage rounded honestly:
+`96%` is accepted against a reading of `96.0%`, `97%` is not. A sentence that
+invents a figure is deleted whole and printed with the figure that killed it,
+the same treatment a fabricated quote gets in the documents profile. A name is
+not a figure, so `ERC-20` and `EIP-1967` pass untouched.
+
+**The linter runs over the result.** The model writes under the vocabulary the
+tool forbids itself, so a note cannot call a coin safe, or a good buy, or score
+it out of ten. A hit fails the command with code 4 rather than being quietly
+rewritten.
+
+```
+CREW NOTES
+  The owner still holds 5.0% of supply and can still change the fee.
+
+  worth checking next
+    whether ownership is given up
+    whether the fee changes
+
+  Clasp · contract powers
+    A fee is taken on transfer and the figure can still move.
+  Gauge · liquidity and exits
+    96.0% of the pool's LP is parked at an address with no known key.
+
+  DELETED BY THE FIGURE CHECK
+    watch[2]: 40000000 (figure is not in the readings)
+```
 
 ---
 
@@ -469,7 +521,8 @@ on-chain powers and of document substitution.
 | `assayer snap <asset> [--all]` | take a snapshot; says whether anything changed | 0 |
 | `assayer extract <asset> [--force] [--challenge]` | fill the legal slots with a model; refuses a coin | money |
 | `assayer verify <asset> [--all]` | run the gate again | 0 |
-| `assayer show <asset> [--json]` | the latest dossier | 0 |
+| `assayer show <asset> [--json] [--notes]` | the latest sheet, and notes already written | 0 |
+| `assayer notes <asset> [--force]` | write the crew's notes on a coin | money |
 | `assayer diff <asset> [a] [b]` | what changed between two snapshots | 0 |
 | `assayer evidence <asset> <slot>` | the window of text around a quote | 0 |
 | `assayer watch [--asset X]` | snapshot every asset, alert on drift | 0 |
@@ -664,8 +717,10 @@ ones you already paid to read.
 
 | situation | cost |
 |---|---|
-| anything on a coin, forever | $0.00 |
+| every reading on a coin, forever | $0.00 |
 | `snap`, `watch`, `verify`, `show`, `diff`, `evidence` | $0.00 |
+| `notes` on a coin, once per changed snapshot | whatever your agent CLI charges |
+| `notes` again while the contract has not moved | $0.00 |
 | one extraction over two documents | roughly $0.10 to $0.40 |
 | any number of runs while the documents are unchanged | $0.00 |
 
@@ -687,9 +742,10 @@ and safe against concurrent writers.
 - `pypdf` for PDFs, and `tomli` on 3.10; both install with the package
 - any agent CLI on PATH, optional
 
-The model is not wired to a vendor. Docket shells out to whatever agent CLI is
-declared in `config.toml`, on your own key: anything that accepts a prompt and
-returns JSON will do, and swapping it is a change of four lines.
+The model is not wired to a vendor. Docket, and the coin notes, shell out to
+whatever agent CLI is declared in `config.toml`, on your own key: anything that
+accepts a prompt and returns JSON will do, and swapping it is a change of four
+lines.
 
 ```toml
 [agent]
@@ -699,9 +755,9 @@ response_field = "result"
 cost_field = "total_cost_usd"
 ```
 
-With no CLI installed the coin profile works in full, `snap`, `verify`, `diff`,
-`show` and `watch` work in full, and `extract` reports itself unavailable and
-returns code 6.
+With no CLI installed every reading still runs: `snap`, `verify`, `diff`, `show`
+and `watch` work in full and a coin sheet prints complete. Only `extract` and
+`notes` report themselves unavailable and return code 6.
 
 ---
 
@@ -725,6 +781,8 @@ file:
 | `test_states.py` | 17 to 18 | failed RPC, unknown proxy pattern |
 | `test_infra.py` | 19 to 22 | budgets, concurrent ledger writes, exit codes |
 | `test_coin.py` | — | the coin profile, end to end |
+| `test_crew.py` | — | the roster against the program's own slot vocabulary |
+| `test_notes.py` | — | the figure check, and that the sheet stays free |
 
 `test_coin.py` holds the coin profile: that it reads without documents, without
 a model and without spending; that a given-up owner, a live owner and a contract

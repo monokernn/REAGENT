@@ -265,6 +265,10 @@ class Paths:
         return self.state / "dossiers"
 
     @property
+    def notes(self) -> Path:
+        return self.state / "notes"
+
+    @property
     def scars(self) -> Path:
         return self.state / "scars.jsonl"
 

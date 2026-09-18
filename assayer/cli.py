@@ -19,7 +19,8 @@ from pathlib import Path
 from typing import Iterable
 from urllib.parse import urlsplit
 
-from . import __version__, diff as diff_mod, ledger, model, scars as scars_mod, util
+from . import (__version__, diff as diff_mod, ledger, model, notes as notes_mod,
+               scars as scars_mod, util)
 from .corpus import Corpus, window
 from .extract import agent as agent_mod
 from .model import E_ABSENCE, E_ONCHAIN, Asset, Document, Dossier
@@ -374,7 +375,86 @@ def cmd_show(args) -> int:
         out(util.canonical_json(gate_mod.load_dossier(p, asset, ts)).rstrip())
         return OK
     out(path.read_text(encoding="utf-8").rstrip())
+    if getattr(args, "notes", False):
+        dossier = gate_mod.load_dossier(p, asset, ts)
+        stored = notes_mod.load(p, asset.name,
+                                str(dossier.get("snapshot_hash") or ""))
+        out("")
+        out(notes_mod.render(stored) if stored else
+            f"no notes for this snapshot yet: assayer notes {asset.name}")
     return OK
+
+
+# ---------------------------------------------------------------- notes
+
+def cmd_notes(args) -> int:
+    """Prose over a coin sheet. The only coin command that can cost anything."""
+    p, config = _paths_and_config(args)
+    try:
+        asset = _asset(p, args.asset)
+    except (FileNotFoundError, ValueError) as exc:
+        out(str(exc))
+        return ERROR
+    if not asset.is_coin:
+        out(f"{asset.name} carries documents, so its sentences are quoted "
+            f"slots rather than commentary: assayer extract {asset.name}")
+        return NOTHING_TO_DO
+
+    timestamps = gate_mod.list_dossiers(p, asset)
+    if not timestamps:
+        out(f"no sheet to write about yet: assayer snap {asset.name}")
+        return ERROR
+    ts = timestamps[-1]
+    dossier = gate_mod.load_dossier(p, asset, ts)
+    snapshot_hash = str(dossier.get("snapshot_hash") or "")
+
+    stored = notes_mod.load(p, asset.name, snapshot_hash)
+    if stored and not args.force:
+        out(notes_mod.render(stored))
+        out("")
+        out(f"already written for snapshot {snapshot_hash[:16]}, and the "
+            f"contract has not moved since: nothing to pay for. --force to "
+            f"write them again.")
+        return OK
+
+    available, detail = agent_mod.agent_available(config)
+    if not available:
+        out(f"agent CLI unavailable: {detail}")
+        out(f"the readings cost nothing and print without it: "
+            f"assayer show {asset.name}")
+        return NO_AGENT
+
+    try:
+        ledger.check(p, config)
+    except ledger.BudgetExceeded as exc:
+        out(f"budget refused: {exc}")
+        return BUDGET
+
+    try:
+        call = agent_mod.call_agent(config, notes_mod.build_prompt(dossier))
+    except agent_mod.AgentUnavailable as exc:
+        out(f"agent CLI unavailable: {exc}")
+        return NO_AGENT
+    except agent_mod.AgentFailed as exc:
+        out(f"agent CLI failed: {exc}")
+        return ERROR
+    # Recorded before the answer is judged: the call was made and the money is
+    # gone whether or not a single sentence survives the figure check.
+    ledger.record(p, call.cost_usd or 0.0, asset=asset.name, kind="notes")
+
+    try:
+        payload = notes_mod.parse(call.response)
+    except ValueError as exc:
+        out(f"the agent did not return usable JSON: {exc}")
+        return ERROR
+
+    result = notes_mod.gate(payload, dossier, config)
+    result.cost_usd = call.cost_usd or 0.0
+    notes_mod.save(p, asset.name, result)
+    out(notes_mod.render(result.to_json()))
+    out("")
+    out(f"snapshot {snapshot_hash[:16]}  ·  ${result.cost_usd:.4f}")
+    return RED_LINE if result.violations else OK
 
 
 # ---------------------------------------------------------------- diff
@@ -827,7 +907,16 @@ def build_parser() -> argparse.ArgumentParser:
     show.add_argument("asset")
     show.add_argument("--ts", help="a specific snapshot")
     show.add_argument("--json", action="store_true")
+    show.add_argument("--notes", action="store_true",
+                      help="also print notes already written, free")
     show.set_defaults(func=cmd_show)
+
+    notes = sub.add_parser("notes",
+                           help="write the crew's notes on a coin: calls your agent CLI")
+    notes.add_argument("asset")
+    notes.add_argument("--force", action="store_true",
+                       help="write them again although the contract has not moved")
+    notes.set_defaults(func=cmd_notes)
 
     diff = sub.add_parser("diff", help="what changed between two snapshots")
     diff.add_argument("asset")

@@ -27,7 +27,12 @@ class Agent:
     asks: str
     coin_slots: tuple[str, ...] = ()
     doc_slots: tuple[str, ...] = ()
+    # Its readings come from a model rather than from bytecode or a document's
+    # own bytes. True for Docket alone, and the reason the coin profile is free.
     calls_model: bool = False
+    # It contributes a sentence to ``assayer notes``. Prose is not a reading:
+    # an agent can write one without any answer of its own coming from a model.
+    writes_notes: bool = False
 
 
 CREW: tuple[Agent, ...] = (
@@ -37,6 +42,7 @@ CREW: tuple[Agent, ...] = (
         beat="identity and origin",
         asks="Is this a deployed token on this chain, and what does it call "
              "itself?",
+        writes_notes=True,
     ),
     Agent(
         id="clasp",
@@ -49,6 +55,7 @@ CREW: tuple[Agent, ...] = (
                     "transfer_limits"),
         doc_slots=("mint_authority", "burn_authority", "pause", "upgradeable",
                    "freeze"),
+        writes_notes=True,
     ),
     Agent(
         id="gauge",
@@ -57,6 +64,7 @@ CREW: tuple[Agent, ...] = (
         asks="How deep is the pool you would have to leave through, and can "
              "its LP still be moved?",
         coin_slots=("liquidity",),
+        writes_notes=True,
     ),
     Agent(
         id="tare",
@@ -65,6 +73,7 @@ CREW: tuple[Agent, ...] = (
         asks="Where does the supply sit, and how much of it can nobody move?",
         coin_slots=("burned_supply",),
         doc_slots=("supply_vs_reserves",),
+        writes_notes=True,
     ),
     Agent(
         id="sift",
@@ -72,6 +81,7 @@ CREW: tuple[Agent, ...] = (
         beat="holders and control",
         asks="How much of the supply sits with whoever still holds the keys?",
         coin_slots=("owner_holdings",),
+        writes_notes=True,
     ),
     Agent(
         id="pulse",
@@ -111,3 +121,7 @@ def owner_of(slot: str, profile: str = "coin") -> Agent | None:
         if slot in getattr(agent, field):
             return agent
     return None
+
+
+# The agents that contribute a sentence to a coin's notes, in printing order.
+NOTE_VOICES: tuple[str, ...] = tuple(a.id for a in CREW if a.writes_notes)

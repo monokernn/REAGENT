@@ -6,7 +6,7 @@ to somebody. These tests fail instead.
 """
 
 from assayer import model
-from assayer.crew import BY_ID, CREW, owner_of
+from assayer.crew import BY_ID, CREW, NOTE_VOICES, owner_of
 
 
 def _claimed(field):
@@ -50,3 +50,15 @@ def test_identifiers_are_unique_and_stable():
     # agents that own readings are checked for one.
     assert all(agent.asks.endswith("?") for agent in CREW
                if agent.coin_slots or agent.doc_slots)
+
+
+def test_a_note_is_not_a_reading():
+    """Prose from a model must never be mistaken for an answer from one."""
+    assert NOTE_VOICES == tuple(a.id for a in CREW if a.writes_notes)
+    assert NOTE_VOICES, "a coin sheet with no voices would have nothing to write"
+    # Docket's answers come from a model, so it must not also be a voice over
+    # readings it did not take.
+    assert not BY_ID["docket"].writes_notes
+    assert all(not BY_ID[v].calls_model for v in NOTE_VOICES), (
+        "an agent whose readings come from a model cannot also narrate the "
+        "deterministic ones")
