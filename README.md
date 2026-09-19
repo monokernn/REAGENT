@@ -22,9 +22,8 @@ intersect claims against the bytes they cite, and delete what does not hold.
 
 ## The crew
 
-Eight agents. The roster is in [`assayer/crew.py`](assayer/crew.py), and
-`tests/test_crew.py` holds it to the program: every reading the tool produces is
-owned by exactly one agent, and a slot added without an owner fails the suite.
+Every reading the tool produces is owned by exactly one agent. A test holds
+that: add a reading without an owner and the suite fails.
 
 | agent | beat | asks | the readings it owns |
 |---|---|---|---|
@@ -37,18 +36,12 @@ owned by exactly one agent, and a slot added without an owner fails the suite.
 | **Docket** | documents and RWA | What do the issuer's own documents say, and does every quote survive the gate? | `instrument_type`, `issuer`, `holder_rights`, `insolvency`, `custodian`, `corporate_actions`, `redemption`, `restrictions` |
 | **Crucible** | the whole picture | Puts the others together, adding nothing they did not find. | none of its own |
 
-Docket is the one agent handed a model, and the one that cannot run in a browser:
-it needs the issuer's files and the gate that checks every quote against the
-bytes it cites.
+**Docket** reads the issuer's own files. Every quote it proposes is cut out of
+the stored bytes and compared before it reaches the sheet; what does not match is
+deleted whole and printed with the reason it died.
 
-What Docket may do is propose a claim. Marking that claim verified, writing into
-`dossier.json`, and deciding that a document it failed to read says nothing are
-other work, done by deterministic code, which is why those answers are the same
-every time and can be re-run for free.
-
-A memecoin has no prospectus, so Docket has nothing to read and is never
-started. Every reading on a coin sheet is therefore free, and a test holds it:
-no agent whose answers come from a model owns a coin reading.
+**Crucible** goes last. It takes what the other seven found and fuses it into one
+picture, and it is allowed to add nothing they did not find.
 
 Prose is a separate thing from a reading, and the roster says so separately.
 Slate, Clasp, Gauge, Tare and Sift can each write a sentence about what they
