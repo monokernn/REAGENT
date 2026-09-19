@@ -102,8 +102,7 @@ def unknown_signals(signals: Iterable[str]) -> list[str]:
 OFFSHORE = (
     "jersey", "guernsey", "isle of man", "cayman", "bvi", "british virgin",
     "bermuda", "bahamas", "panama", "seychelles", "belize", "liechtenstein",
-    "marshall islands", "gibraltar", "джерси", "кайман", "сейшел", "панам",
-    "бермуд", "гибралтар", "лихтенштейн",
+    "marshall islands", "gibraltar",
 )
 
 

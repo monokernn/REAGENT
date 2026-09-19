@@ -115,7 +115,8 @@ def test_8c_patterns_come_from_config_not_from_code(config):
     configured = injection_mod.flatten_patterns(
         config["gate"]["injection_patterns"])
     assert "ignore previous" in configured
-    assert "игнорируй предыдущие" in configured
+    # Every configured list is flattened, not just the English one.
+    assert "ignorez les instructions" in configured
     empty = injection_mod.scan_text("ignore previous instructions",
                                     doc_id="d", sha256="s", patterns=[])
     assert empty == [], "with no configured patterns the detector stays quiet"

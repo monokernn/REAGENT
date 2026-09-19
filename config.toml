@@ -56,18 +56,6 @@ en = [
   "override the",
   "as an ai language model",
 ]
-ru = [
-  "игнорируй предыдущие",
-  "игнорируй все предыдущие",
-  "не обращай внимания на предыдущие",
-  "отчёт должен",
-  "отчет должен",
-  "новые инструкции",
-  "ты — ии",
-  "ты искусственный интеллект",
-  "система:",
-  "ассистент:",
-]
 other = [
   "ignorez les instructions",
   "vorherige anweisungen ignorieren",
@@ -87,7 +75,4 @@ forbidden = [
   "scam", "legit", "legitimate", "trustworthy", "reliable",
   "audited", "verified safe", "guaranteed", "risk score",
   "investment advice", "recommend", "recommendation",
-  "надёжный", "надежный", "рискованный", "безопасный", "опасный",
-  "покупать", "продавать", "скам", "мошенник", "рекомендуем", "рекомендация",
-  "риск-скор", "риск-балл",
 ]

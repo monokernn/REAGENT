@@ -182,29 +182,21 @@ def test_3b_onchain_absence_belongs_to_the_powers_section() -> None:
     assert language.check_sections(dossier, bad)
 
 
-@pytest.mark.parametrize("name", ["README.md", "README.ru.md"])
-def test_3c_readme_keeps_the_vocabulary(name: str) -> None:
-    """Every README is held to the same words as the output, with two exceptions.
+def test_3c_readme_keeps_the_vocabulary() -> None:
+    """The README is held to the same words as the output, with two exceptions.
 
     "audit" and "investment advice" are each permitted once, inside the section
     that denies being either. Everything else on the list is out.
     """
-    readme = PACKAGE.parent / name
-    if not readme.exists():
-        pytest.skip(f"{name} not present")
-    text = readme.read_text(encoding="utf-8").lower()
+    text = (PACKAGE.parent / "README.md").read_text(encoding="utf-8").lower()
 
-    assert text.count("audit") + text.count("аудит") <= 2, \
-        "the word audit appears more than once outside its denial"
-    assert text.count("investment advice") + text.count("инвестиционный совет") <= 1
+    assert text.count("audit") <= 2,         "the word audit appears more than once outside its denial"
+    assert text.count("investment advice") <= 1
 
-    for word in ("risk score", "риск-скор", "verified safe", "guaranteed",
-                 "гарантирует", "надёжный актив", "рискованный", "audited",
-                 "рекомендуем", "recommend"):
-        assert word not in text, f"{name} uses {word!r}"
+    for word in ("risk score", "verified safe", "guaranteed", "audited",
+                 "recommend"):
+        assert word not in text, f"the README uses {word!r}"
 
     # The vocabulary the plan asks for, present and used.
-    wanted = ("surveillance", "assay", "adversarial",
-              "дрейф" if name.endswith("ru.md") else "drift")
-    for word in wanted:
-        assert word in text, f"{name} never uses {word!r}"
+    for word in ("surveillance", "assay", "adversarial", "drift"):
+        assert word in text, f"the README never uses {word!r}"

@@ -20,10 +20,10 @@ from assayer.cli import BUDGET, NO_AGENT, OK, USAGE, main
 from assayer.extract import agent as agent_mod
 
 STORY = """\
-В ноябре 2025 эмитент токенизированной ноты приостановил выкуп на неопределённый
-срок. Логика контракта была заменена в тот же день без периода ожидания, а отчёт
-о резервах публиковал сам эмитент, без независимого проверяющего. Компания
-зарегистрирована на Джерси.
+In late 2025 the issuer suspended redemptions without notice, and the token
+traded well below its stated backing. The proxy behind it could be replaced
+with no waiting period, the reserve report named no independent attestor, and
+the issuing entity was registered in Jersey.
 """
 
 DECOMPOSING_AGENT = '''\
@@ -31,7 +31,7 @@ import json, sys
 prompt = sys.stdin.read()
 assert "SIGNAL NAMES" in prompt, "the vocabulary must be handed over"
 assert "upgrade_no_timelock" in prompt
-answer = {"what": "Эмитент приостановил выкуп; логика заменена без задержки",
+answer = {"what": "Redemptions suspended; collateral partly illiquid",
           "signals": ["upgrade_no_timelock", "self_attested_reserves",
                       "offshore_issuer", "issuer_lied_to_regulator"]}
 print(json.dumps({"result": json.dumps(answer), "total_cost_usd": 0.004}))
@@ -121,7 +121,7 @@ def test_decomposition_filters_what_the_model_proposes(paths, config, decomposer
     assert kept == ["upgrade_no_timelock", "self_attested_reserves",
                     "offshore_issuer"]
     assert discarded == ["issuer_lied_to_regulator"]
-    assert what.startswith("Эмитент приостановил")
+    assert what.startswith("Redemptions suspended")
     assert cost == pytest.approx(0.004)
 
 

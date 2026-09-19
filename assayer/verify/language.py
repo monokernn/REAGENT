@@ -34,8 +34,8 @@ SCORE_KEY = re.compile(r"(?:^|[._])(?:score|rating|grade|verdict|recommendation)
                        re.I)
 SCORE_TEXT = (
     re.compile(r"\b\d{1,3}\s*/\s*(?:5|10|100)\b"),
-    re.compile(r"\b\d{1,2}\s+(?:из|of)\s+(?:5|10|100)\b", re.I),
-    re.compile(r"\b(?:score|балл|рейтинг)\s*[:=]\s*\d", re.I),
+    re.compile(r"\b\d{1,2}\s+of\s+(?:5|10|100)\b", re.I),
+    re.compile(r"\b(?:score|rating|grade)\s*[:=]\s*\d", re.I),
 )
 
 

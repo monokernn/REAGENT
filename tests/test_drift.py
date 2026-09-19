@@ -149,14 +149,14 @@ def test_instrument_category_survives_wording(paths):
     from assayer.extract.schema import parse
     from assayer.model import instrument_category
 
-    assert instrument_category("долговая нота эмитента") == "debt_security"
+    assert instrument_category("an unsecured note of the issuer") == "debt_security"
     assert instrument_category("equity in the operating company") == "equity"
     assert instrument_category("depositary receipt over shares") == \
         "depositary_receipt"
     assert instrument_category("something unclassifiable") is None
 
     parsed = parse('{"slots": [{"slot": "instrument_type", "state": "filled",'
-                   ' "value": "долговая нота эмитента",'
+                   ' "value": "an unsecured note of the issuer",'
                    ' "evidence": {"kind": "document", "doc_id": "p",'
                    ' "sha256": "ab", "quote": "debt securities"}}]}')
     assert parsed.ok

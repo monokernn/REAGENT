@@ -47,12 +47,11 @@ halt_on_injection = true
 [gate.injection_patterns]
 en = ["ignore previous", "disregard the above", "system:", "you are an ai",
       "new instructions", "the report must"]
-ru = ["игнорируй предыдущие", "отчёт должен"]
+other = ["ignorez les instructions"]
 
 [language]
 forbidden = ["safe", "risky", "buy", "sell", "scam", "legit", "reliable",
-             "audited", "guaranteed", "risk score", "investment advice",
-             "надёжный", "рискованный", "покупать", "продавать"]
+             "audited", "guaranteed", "risk score", "investment advice"]
 """
 
 

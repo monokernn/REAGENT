@@ -86,10 +86,10 @@ VOLATILE_VALUE_SLOTS: frozenset[str] = frozenset({
 # sentence; the canonical token is recovered from it here so that signals and
 # diffs compare a category rather than a phrasing.
 INSTRUMENT_CATEGORIES: dict[str, tuple[str, ...]] = {
-    "debt_security": ("debt", "note", "bond", "долг", "нот", "облигац"),
-    "depositary_receipt": ("depositary", "receipt", "депозитар", "расписк"),
-    "synthetic": ("synthetic", "swap", "cfd", "синтет", "своп"),
-    "equity": ("equity", "share", "stock", "акци", "доля в капитале"),
+    "debt_security": ("debt", "note", "bond"),
+    "depositary_receipt": ("depositary", "receipt"),
+    "synthetic": ("synthetic", "swap", "cfd"),
+    "equity": ("equity", "share", "stock"),
 }
 
 
@@ -418,7 +418,7 @@ def asset_path(p: util.Paths, chain: str, address: str) -> "object":
 
 def slug(text: str) -> str:
     """Lowercase, punctuation to dashes: ``Assay Note ASSY`` -> ``assay-note-assy``."""
-    out = re.sub(r"[^0-9a-zа-яё]+", "-", str(text).lower())
+    out = re.sub(r"[^0-9a-z]+", "-", str(text).lower())
     return out.strip("-")
 
 
