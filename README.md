@@ -97,7 +97,7 @@ deleted before anybody saw it.
 | slots | 12, all from bytecode and storage | 8 legal + 8 on-chain |
 | the crew | seven agents | all eight |
 | what gets written | nothing, unless you ask for notes | the eight legal slots, once per changed snapshot |
-| cost | $0.00 for the sheet | ~$0.10–0.40 per extraction |
+| cost | the sheet is free, always; notes are the only thing that can be billed | one call per changed snapshot, priced by your agent CLI against the documents' length, under the ceiling in `[budget]` |
 | the gate | readings need none; notes get the figure check and the linter | quotes, injections, provenance, language |
 | catches | a power that is still live, a pool whose LP is still movable | a prospectus that says something the interface does not |
 
@@ -733,14 +733,24 @@ same ones you already paid to read.
 | `notes` on a coin, once per changed snapshot | whatever your agent CLI charges |
 | `notes` again while the contract has not moved | $0.00 |
 | `notes --recheck` over the whole archive, under tightened rules | $0.00 |
-| one extraction over two documents | roughly $0.10 to $0.40 |
+| one extraction over two documents | whatever your agent CLI charges to read them |
 | any number of runs while the documents are unchanged | $0.00 |
+
+What an extraction costs is not something this repository can quote for you. It
+is one call carrying the documents' full text, so the bill is set by their length
+and by the price of whatever CLI you named in `[agent]` — the same prospectus
+runs orders of magnitude apart on a small model and a frontier one. What the tool
+gives you instead is a ceiling you set yourself, and a record of every cent that
+actually went out.
 
 Two limits live in `[budget]`:
 
 - `max_usd_per_day` refuses the next extraction once the day's total is reached.
+  The shipped `config.toml` sets it to `2.00`.
 - `max_usd_per_extraction` cannot interrupt a call that is already running, so its
   cost is recorded and the next call refuses to start until a person has looked.
+  The shipped value is `0.40`; raise it for long documents or an expensive CLI,
+  and the first real extraction tells you what yours actually costs.
 
 Every spend lands in `state/budget.json` and `state/log.jsonl`, written atomically
 and safe against concurrent writers.
