@@ -409,6 +409,10 @@ def cmd_notes(args) -> int:
     snapshot_hash = str(dossier.get("snapshot_hash") or "")
 
     stored = notes_mod.load(p, asset.name, snapshot_hash)
+
+    if args.recheck:
+        return _recheck_notes(p, config, asset, stored, dossier, snapshot_hash)
+
     if stored and not args.force:
         out(notes_mod.render(stored))
         out("")
@@ -454,6 +458,58 @@ def cmd_notes(args) -> int:
     out(notes_mod.render(result.to_json()))
     out("")
     out(f"snapshot {snapshot_hash[:16]}  ·  ${result.cost_usd:.4f}")
+    return RED_LINE if result.violations else OK
+
+
+def _recheck_notes(p, config, asset, stored, dossier, snapshot_hash) -> int:
+    """Judge sentences already paid for under today's rules. Calls nothing.
+
+    The gate's rules are ours and they move; the sentences cost money once. So a
+    recheck reruns the figure check and the linter over the stored proposal and
+    prints what the movement did, rather than buying the same paragraph again.
+    """
+    from .render import _wrap
+
+    if not stored:
+        out(f"nothing written for snapshot {snapshot_hash[:16]} yet: "
+            f"assayer notes {asset.name}")
+        return ERROR
+    try:
+        result = notes_mod.regate(stored, dossier, config)
+    except LookupError as exc:
+        out(f"{exc}.")
+        out(f"assayer notes {asset.name} --force writes them again, and that "
+            f"one costs money.")
+        return ERROR
+
+    # Two axes move independently: the figure check decides what survives, the
+    # linter decides what is objected to. A recheck that reports only the first
+    # would call a verdict unchanged while the linter was objecting to it.
+    before = notes_mod.sentences(stored.get("notes") or {})
+    after = notes_mod.sentences(result.notes)
+    dropped = [s for s in before if s not in after]
+    admitted = [s for s in after if s not in before]
+    objected = set(result.violations) - set(stored.get("violations") or [])
+    cleared = set(stored.get("violations") or []) - set(result.violations)
+
+    notes_mod.save(p, asset.name, result)
+    out(notes_mod.render(result.to_json()))
+    out("")
+    if dropped or admitted or objected or cleared:
+        out("  THE RULES HAVE MOVED SINCE THESE WERE WRITTEN")
+        for sentence in dropped:
+            out("\n".join(_wrap(f"now deleted: {sentence}", 4)))
+        for sentence in admitted:
+            out("\n".join(_wrap(f"now kept: {sentence}", 4)))
+        for item in sorted(objected):
+            out("\n".join(_wrap(f"now objected to: {item}", 4)))
+        for item in sorted(cleared):
+            out("\n".join(_wrap(f"no longer objected to: {item}", 4)))
+    else:
+        out(f"  today's rules reach the same verdict: {len(after)} kept, "
+            f"{len(result.rejected)} deleted")
+    out("")
+    out(f"snapshot {snapshot_hash[:16]}  ·  $0.0000, nothing was called")
     return RED_LINE if result.violations else OK
 
 
@@ -914,8 +970,13 @@ def build_parser() -> argparse.ArgumentParser:
     notes = sub.add_parser("notes",
                            help="write the crew's notes on a coin: calls your agent CLI")
     notes.add_argument("asset")
-    notes.add_argument("--force", action="store_true",
-                       help="write them again although the contract has not moved")
+    notes_again = notes.add_mutually_exclusive_group()
+    notes_again.add_argument("--force", action="store_true",
+                             help="write them again although the contract has "
+                                  "not moved")
+    notes_again.add_argument("--recheck", action="store_true",
+                             help="judge what was already written under "
+                                  "today's rules, free")
     notes.set_defaults(func=cmd_notes)
 
     diff = sub.add_parser("diff", help="what changed between two snapshots")

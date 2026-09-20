@@ -1,6 +1,6 @@
 # REAGENT (RWA Evidence Agent)
 
-![tests](https://img.shields.io/badge/tests-136%20passing-2ea44f)
+![tests](https://img.shields.io/badge/tests-142%20passing-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
@@ -9,12 +9,14 @@ every line names the function, the block or the page it came from.
 
 The work is divided among a crew of agents. Each owns one question, is handed
 only the evidence that bears on it, and answers from that alone. They do not
-talk to each other: a snapshot is collected once, by scripts, and given to all of
-them at the same moment, so two readings cannot rest on two different
-observations of the same contract.
+talk to each other: a snapshot is collected once, before any of them answers, and
+given to all of them at the same moment, so two readings cannot rest on two
+different observations of the same contract.
 
-One agent is handed a model. The rest read bytecode and storage, hash documents,
-intersect claims against the bytes they cite, and delete what does not hold.
+Most of the crew only reads: bytecode, storage, the stored bytes of a document.
+Two jobs involve writing — Docket answering the document questionnaire, and five
+agents adding sentences to a coin sheet. What they write is a proposal. It is
+checked against the bytes first, and the sheet takes what survived.
 
 ![REAGENT — RWA Evidence Agent](media/banner1.gif)
 
@@ -52,17 +54,17 @@ the sheet prints in full without ever asking for one.
 
 One observation, from which the architecture follows:
 
-> Extraction is expensive and untrusted. Verification is cheap and trusted.
-> Therefore they must not be the same operation.
+> Writing a claim costs money. Checking it against the bytes costs nothing.
+> So they are separate operations, run by separate code.
 
-Work is handed over through three artefact types on disk, each addressed by its
-content:
+Work is handed over through artefacts on disk, each addressed by its content:
 
-| artefact | produced by | cost | trust |
+| artefact | produced by | cost | before anybody reads it |
 |---|---|---|---|
-| **snapshot** | scripts: on-chain readers and document fetches | ~0 | trusted, reproducible |
-| **extraction** | a model, reading the documents in a snapshot | money | **untrusted** |
-| **dossier** | the verifier: extraction intersected with snapshot | ~0 | trusted |
+| **snapshot** | the crew, reading the chain and fetching the issuer's files | ~0 | nothing; it is the record |
+| **extraction** | Docket, over the documents in that snapshot | money | every quote is cut from the stored bytes and compared |
+| **notes** | five agents, over readings already taken | money | every figure is checked against those readings, then the linter runs |
+| **dossier** | the verifier | ~0 | it is what survived |
 
 Four properties fall out of the separation for free.
 
@@ -71,9 +73,11 @@ dossier carries no wall-clock stamp of when it was produced; its date comes from
 the snapshot. Two runs over the same inputs produce a byte-identical
 `dossier.json`, and a test holds that.
 
-**Free re-verification.** Improve the rules of the gate, then run them over the
-whole archive of old extractions without a single model call:
-`assayer verify --all`.
+**Free re-verification.** The rules of the gate are ours and they move. Tighten
+one, then run it over everything already written without buying any of it again:
+`assayer verify --all` for extractions, `assayer notes <asset> --recheck` for
+notes. Both are possible because what was proposed is kept on disk beside what
+survived it.
 
 **Drift as the base case, not a feature.** Snapshots are structured and
 content-addressed, so "what changed" is not a subsystem. It is subtraction.
@@ -81,8 +85,9 @@ content-addressed, so "what changed" is not a subsystem. It is subtraction.
 **Separate budgets.** Observation costs nothing and can run every hour. You pay
 only when a snapshot has actually changed.
 
-The product is not "a model reads a prospectus". It is tamper-evident
-surveillance of drift, with every statement traceable to the bytes it came from.
+What it amounts to is tamper-evident surveillance of drift: every statement on
+the sheet traces to the bytes it came from, and whatever could not be traced was
+deleted before anybody saw it.
 
 ## Two profiles, one machine
 
@@ -91,9 +96,9 @@ surveillance of drift, with every statement traceable to the bytes it came from.
 | what it reads | the contract | the contract **and** the issuer's documents |
 | slots | 12, all from bytecode and storage | 8 legal + 8 on-chain |
 | the crew | seven agents | all eight |
-| the model | never for a reading; notes are opt-in | once per changed snapshot |
+| what gets written | nothing, unless you ask for notes | the eight legal slots, once per changed snapshot |
 | cost | $0.00 for the sheet | ~$0.10–0.40 per extraction |
-| the gate | nothing to intersect: no claim was proposed | quotes, injections, provenance, language |
+| the gate | readings need none; notes get the figure check and the linter | quotes, injections, provenance, language |
 | catches | a power that is still live, a pool whose LP is still movable | a prospectus that says something the interface does not |
 
 Both profiles answer the same four questions:
@@ -116,12 +121,12 @@ The tool produces a document; the person decides.
 | section | what is in it |
 |---|---|
 | [The crew](#the-crew) | eight agents, and which readings each one owns |
-| [Ordinary coins](#ordinary-coins) | the default profile: twelve readings, no documents, no model |
+| [Ordinary coins](#ordinary-coins) | the default profile: twelve readings, taken from bytecode alone |
 | [Assets with documents](#assets-with-documents) | the gap this was built for, and a dossier in full |
 | [Start](#start) | install, configure, first snapshot |
 | [How it works](#how-it-works) | snapshot, extract, verify |
 | [The gate](#the-gate) | how fabrications and injections are caught |
-| [What this is not](#what-this-is-not) | stated plainly |
+| [Where it stops](#where-it-stops) | the boundary, stated plainly |
 | [Cost](#cost) | real numbers |
 | [Requirements](#requirements) | Python, RPC, optional agent CLI |
 | [Tests](#tests) | what is held by a blocking test |
@@ -134,7 +139,8 @@ The tool produces a document; the person decides.
 A memecoin has no prospectus, no custodian and no reserve report. The legal
 questionnaire therefore has nothing to be filled from, and the paid role has
 nothing to read — so it is not started. Everything a holder can be told about one
-is a fact about bytecode and storage, and the coin profile reads it with scripts.
+is a fact about bytecode and storage, and seven agents read it straight off the
+chain.
 
 ```bash
 assayer add robinhood:0xADDRESS --coin --label "$PONS" --pool 0xPAIR
@@ -256,6 +262,7 @@ it is the one coin command that can cost anything:
 
 ```bash
 assayer notes robinhood-0xaddress     # calls the agent CLI named in config.toml
+assayer notes robinhood-0xaddress --recheck  # judge what was written, free
 assayer show robinhood-0xaddress --notes   # prints what was already written, free
 ```
 
@@ -274,10 +281,16 @@ invents a figure is deleted whole and printed with the figure that killed it,
 the same treatment a fabricated quote gets in the documents profile. A name is
 not a figure, so `ERC-20` and `EIP-1967` pass untouched.
 
-**The linter runs over the result.** The model writes under the vocabulary the
+**The linter runs over the result.** The writer works under the vocabulary the
 tool forbids itself, so a note cannot call a coin safe, or a good buy, or score
 it out of ten. A hit fails the command with code 4 rather than being quietly
 rewritten.
+
+Both of those checks are ours, and ours change. So the sentences that were
+proposed are kept on disk beside the ones that survived: tighten the figure rule
+or add a word to the forbidden list, and `--recheck` puts every note already
+written in front of the new rules, prints what the change did, and spends
+nothing. The sentences were bought once.
 
 ```
 CREW NOTES
@@ -512,10 +525,11 @@ on-chain powers and of document substitution.
 | `assayer add <chain>:<address> --coin [--pool …]` | register a coin | 0 |
 | `assayer add <chain>:<address> --docs …` | register an asset with documents | 0 |
 | `assayer snap <asset> [--all]` | take a snapshot; says whether anything changed | 0 |
-| `assayer extract <asset> [--force] [--challenge]` | fill the legal slots with a model; refuses a coin | money |
+| `assayer extract <asset> [--force] [--challenge]` | put Docket to the legal slots; refuses a coin | money |
 | `assayer verify <asset> [--all]` | run the gate again | 0 |
 | `assayer show <asset> [--json] [--notes]` | the latest sheet, and notes already written | 0 |
 | `assayer notes <asset> [--force]` | write the crew's notes on a coin | money |
+| `assayer notes <asset> --recheck` | judge notes already written under today's rules | 0 |
 | `assayer diff <asset> [a] [b]` | what changed between two snapshots | 0 |
 | `assayer evidence <asset> <slot>` | the window of text around a quote | 0 |
 | `assayer watch [--asset X]` | snapshot every asset, alert on drift | 0 |
@@ -546,12 +560,13 @@ moved.
 
 ## How it works
 
-Three phases. Two are free, one is not, and the expensive one sits between two
-that check it.
+Three phases for the sheet. Two are free, the third is not, and the expensive one
+sits between two that check it. `notes` is the only other thing that spends
+anything, and it is held to the same shape: propose, then be checked.
 
 ### snapshot: zero tokens
 
-Scripts only, fully deterministic. Eight on-chain slots are read and handed to
+Reading only, fully deterministic. Eight on-chain slots are read and handed to
 the agents that own them — five to Clasp, two to Pulse, one to Tare:
 
 | slot | what is read |
@@ -573,19 +588,19 @@ observed identity of the asset.
 Neither hash covers the block number or the clock. Otherwise every new block would
 look like a change, and "pay only for drift" would decay into "pay always".
 
-### extract: the only phase that costs money
+### extract: where the documents are read
 
-Docket, and the only point in the system where a model is used. It receives the
-canonical texts and a fixed questionnaire of eight legal slots: instrument type,
-issuer, holder rights, insolvency, custodian, corporate actions, redemption,
-restrictions. No open questions are asked, because an open question produces
-prose that cannot be diffed against the same question next month.
+Docket, put to the issuer's files. It receives the canonical texts and a fixed
+questionnaire of eight legal slots: instrument type, issuer, holder rights,
+insolvency, custodian, corporate actions, redemption, restrictions. No open
+questions are asked, because an open question produces prose that cannot be
+diffed against the same question next month.
 
 Rules Docket works under:
 
 - the answer is JSON only, no prose;
 - every filled slot carries a doc_id, the document's sha256 and a verbatim quote;
-- offsets are computed by the gate, never trusted from the model;
+- offsets are computed by the gate, never taken from the answer;
 - invalid JSON gets one retry, after which slots are marked `not_checked`;
 - if `snapshot_hash` has not changed, the phase refuses to spend anything.
 
@@ -595,7 +610,7 @@ disagree about the same sentence.
 
 ### verify: the gate
 
-Deterministic code, zero model calls: every claim Docket proposed is intersected
+Deterministic code that calls nothing: every claim Docket proposed is intersected
 with the bytes it cited, and what survives is assembled into `dossier.json` and
 `dossier.txt`. It can be re-run over existing extractions as often as you like.
 
@@ -603,8 +618,10 @@ with the bytes it cited, and what survives is assembled into `dossier.json` and
 
 ## The gate
 
-Four independent checks, all in `assayer/verify/`, all without a model. **The model
-does not verify itself.**
+Four independent checks on an extraction, all in `assayer/verify/`, none of which
+asks anybody to write anything. **Nothing here is left to judge its own work.**
+The coin notes get their own two checks, described [above](#notes-if-you-want-sentences):
+the same idea, over figures instead of quotes.
 
 ### Quotes
 
@@ -621,9 +638,8 @@ disagree about (whitespace, dashes, quotes, case), and compared.
 
 A rejected slot does not "lose confidence". It is deleted whole, and the deletion
 is printed with its reason. Three inventions from one document and that document
-is marked `tainted`, printed with a warning. The tool catching its own model
-inventing a source, and showing the reader, is the only direct evidence that the
-gate works.
+is marked `tainted`, printed with a warning. The tool catching an invented source
+and showing it to the reader is the only direct evidence that the gate works.
 
 ### Injections
 
@@ -668,13 +684,20 @@ Details: [docs/verification.md](docs/verification.md),
 
 ---
 
-## What this is not
+## Where it stops
 
-**Not an audit. Not investment advice. It does not establish that the collateral
-exists.**
+REAGENT prints what the contract records and what the documents say, and marks
+every place it could not look with the reason. That is the whole job. An audit is
+a different one, advice is somebody else's, and whether the collateral is really
+there is a question no reader of a chain can answer.
 
-REAGENT shows what the documents say and what the contract records, and states
-just as loudly what it could not check.
+There is no assessment of the asset in the output: no score, no rating, no
+suggestion to act. That is a property of the product, not a disclaimer, and a
+test holds it. A tool that slid from "the document says X" to "this asset is
+sound" would become a source of false confidence, and that is worse than having
+no tool.
+
+What that looks like in the output:
 
 - An empty slot is a result. "Three documents say nothing about what happens if
   the issuer becomes insolvent" is often the most valuable finding on the sheet,
@@ -690,11 +713,6 @@ just as loudly what it could not check.
 assayer evidence <asset> holder_rights
 ```
 
-There is no assessment of the asset in the output: no score, no rating, no
-suggestion to act. That is a property of the product, not a disclaimer. A tool
-that slid from "the document says X" to "this asset is sound" would become a
-source of false confidence and would be worse than no tool at all.
-
 ---
 
 ## Cost
@@ -704,9 +722,9 @@ document fetches: zero tokens, zero dollars, as often as you like. The gate is
 free too, which is why `assayer verify --all` re-checks the whole archive under
 improved rules at no cost.
 
-**You pay for drift only.** `extract` calls the model, and refuses to do so if
-`snapshot_hash` has not changed since last time, or if the documents are the same
-ones you already paid to read.
+**You pay for drift only.** `extract` calls the agent CLI, and refuses to do so
+if `snapshot_hash` has not changed since last time, or if the documents are the
+same ones you already paid to read.
 
 | situation | cost |
 |---|---|
@@ -714,6 +732,7 @@ ones you already paid to read.
 | `snap`, `watch`, `verify`, `show`, `diff`, `evidence` | $0.00 |
 | `notes` on a coin, once per changed snapshot | whatever your agent CLI charges |
 | `notes` again while the contract has not moved | $0.00 |
+| `notes --recheck` over the whole archive, under tightened rules | $0.00 |
 | one extraction over two documents | roughly $0.10 to $0.40 |
 | any number of runs while the documents are unchanged | $0.00 |
 
@@ -735,10 +754,10 @@ and safe against concurrent writers.
 - `pypdf` for PDFs, and `tomli` on 3.10; both install with the package
 - any agent CLI on PATH, optional
 
-The model is not wired to a vendor. Docket, and the coin notes, shell out to
-whatever agent CLI is declared in `config.toml`, on your own key: anything that
-accepts a prompt and returns JSON will do, and swapping it is a change of four
-lines.
+Docket and the coin notes shell out to whatever agent CLI is declared in
+`config.toml`, on your own key — a language model of your choosing, not one wired
+in here. Anything that accepts a prompt and returns JSON will do, and swapping it
+is a change of four lines.
 
 ```toml
 [agent]

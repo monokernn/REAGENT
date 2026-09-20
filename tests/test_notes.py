@@ -13,10 +13,12 @@ whether or not a sentence survived it.
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from assayer import model, notes as notes_mod, util
-from assayer.cli import NO_AGENT, NOTHING_TO_DO, OK, RED_LINE, main
+from assayer.cli import ERROR, NO_AGENT, NOTHING_TO_DO, OK, RED_LINE, main
 from assayer.extract.agent import AgentCall
 from assayer.verify import gate as gate_mod
 from conftest import write_asset
@@ -184,6 +186,115 @@ def test_a_forbidden_word_fails_the_command(sheet, home, config, monkeypatch):
                         _stub({"headline": f"The contract is {forbidden}."}))
 
     assert main(["--home", str(home), "notes", asset.name]) == RED_LINE
+
+
+# ------------------------------------------------- judging it a second time
+
+def test_what_was_proposed_is_kept_beside_what_survived(
+        sheet, home, paths, monkeypatch):
+    """Without the proposal on disk there is nothing left to judge again."""
+    asset, _dossier = sheet
+    from assayer.extract import agent as agent_mod
+
+    monkeypatch.setattr(agent_mod, "agent_available", lambda c: (True, "stub"))
+    monkeypatch.setattr(agent_mod, "call_agent", _stub({
+        "headline": "A fee is taken on transfer.",
+        "summary": "A partnership with a 40000000 dollar treasury is planned.",
+    }))
+    assert main(["--home", str(home), "notes", asset.name]) == OK
+
+    stored = notes_mod.load(paths, asset.name, _dossier_hash(paths, asset))
+    assert "summary" not in stored["notes"], "the invented figure was deleted"
+    assert "40000000" in stored["proposed"]["summary"], \
+        "but the sentence that was paid for is still there to be judged again"
+
+
+def test_a_recheck_judges_the_proposal_again_rather_than_the_verdict(sheet):
+    _asset, dossier = sheet
+    first = notes_mod.gate({
+        "headline": "A fee is taken on transfer.",
+        "summary": "Supply is 777777777 tokens.",
+    }, dossier)
+    first.cost_usd = 0.03
+    assert "summary" not in first.notes
+
+    again = notes_mod.regate(first.to_json(), dossier)
+
+    assert again.notes == first.notes
+    assert [r["where"] for r in again.rejected] == ["summary"], \
+        "the deleted sentence is judged again, not silently forgotten"
+    assert again.cost_usd == 0.03, "the money was spent once and stays recorded"
+
+
+def test_a_recheck_calls_nothing_and_buys_nothing(
+        sheet, home, paths, monkeypatch):
+    asset, _dossier = sheet
+    from assayer import ledger
+    from assayer.extract import agent as agent_mod
+
+    monkeypatch.setattr(agent_mod, "agent_available", lambda c: (True, "stub"))
+    monkeypatch.setattr(agent_mod, "call_agent",
+                        _stub({"headline": "A fee is taken on transfer."}, 0.03))
+    assert main(["--home", str(home), "notes", asset.name]) == OK
+    spent = ledger.state(paths).spent_today
+
+    def never(*_a, **_k):
+        raise AssertionError("a recheck must not reach the agent CLI")
+
+    monkeypatch.setattr(agent_mod, "call_agent", never)
+    monkeypatch.setattr(notes_mod, "build_prompt", never)
+    assert main(["--home", str(home), "notes", asset.name, "--recheck"]) == OK
+
+    assert ledger.state(paths).spent_today == spent, "a recheck buys nothing"
+    stored = notes_mod.load(paths, asset.name, _dossier_hash(paths, asset))
+    assert stored["cost_usd"] == 0.03, "and does not erase what was spent"
+
+
+def test_a_word_added_to_the_forbidden_list_catches_a_note_already_written(
+        sheet, home, paths, monkeypatch):
+    """The gate's vocabulary is ours, so tightening it reaches the archive."""
+    asset, _dossier = sheet
+    from assayer.extract import agent as agent_mod
+
+    monkeypatch.setattr(agent_mod, "agent_available", lambda c: (True, "stub"))
+    monkeypatch.setattr(agent_mod, "call_agent",
+                        _stub({"headline": "The deployment is straightforward."}))
+    assert main(["--home", str(home), "notes", asset.name]) == OK
+
+    config_file = home / "config.toml"
+    config_file.write_text(
+        config_file.read_text(encoding="utf-8").replace(
+            'forbidden = ["safe"', 'forbidden = ["straightforward", "safe"'),
+        encoding="utf-8")
+
+    assert main(["--home", str(home), "notes", asset.name, "--recheck"]) == RED_LINE
+    stored = notes_mod.load(paths, asset.name, _dossier_hash(paths, asset))
+    assert stored["violations"], "the word added today must be reported today"
+
+
+def test_notes_written_before_the_proposal_was_kept_say_so(
+        sheet, home, paths, monkeypatch):
+    asset, _dossier = sheet
+    from assayer.extract import agent as agent_mod
+
+    monkeypatch.setattr(agent_mod, "agent_available", lambda c: (True, "stub"))
+    monkeypatch.setattr(agent_mod, "call_agent",
+                        _stub({"headline": "A fee is taken on transfer."}))
+    assert main(["--home", str(home), "notes", asset.name]) == OK
+
+    # An archive entry from before the proposal was carried out of the gate.
+    target = notes_mod.path_for(paths, asset.name, _dossier_hash(paths, asset))
+    old = json.loads(target.read_text(encoding="utf-8"))
+    old.pop("proposed")
+    target.write_text(json.dumps(old), encoding="utf-8")
+
+    assert main(["--home", str(home), "notes", asset.name, "--recheck"]) == ERROR
+
+
+def test_a_recheck_of_an_asset_nobody_has_written_about_says_what_to_run(
+        sheet, home):
+    asset, _dossier = sheet
+    assert main(["--home", str(home), "notes", asset.name, "--recheck"]) == ERROR
 
 
 # ------------------------------------------------------------- helpers

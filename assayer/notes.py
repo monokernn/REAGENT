@@ -19,9 +19,16 @@ the figure that killed it — the same treatment a fabricated quote gets in the
 documents profile, and for the same reason: an invented figure is worse than a
 missing sentence.
 
-**The language linter runs over the result.** The model writes under the same
+**The language linter runs over the result.** The writer works under the same
 vocabulary the tool itself obeys, so a note cannot call a coin safe, or a good
 buy, or score it out of ten.
+
+What was proposed is kept on disk beside what survived. The two checks above are
+ours, and ours change: tighten the figure rule or add a word to the forbidden
+list and every note already written can be judged again by ``notes --recheck``,
+at no cost, because the sentences do not have to be bought a second time. The
+documents profile has had this since the beginning under ``verify --all``; this
+is the same property, for the other thing that costs money.
 """
 
 from __future__ import annotations
@@ -64,10 +71,12 @@ class NotesResult:
     violations: list[str] = field(default_factory=list)
     cost_usd: float = 0.0
     snapshot_hash: str = ""
+    proposed: dict = field(default_factory=dict)
 
     def to_json(self) -> dict:
         return {
             "snapshot_hash": self.snapshot_hash,
+            "proposed": self.proposed,
             "notes": self.notes,
             "rejected": self.rejected,
             "violations": self.violations,
@@ -266,8 +275,49 @@ def gate(payload: dict, dossier: dict, config: dict | None = None) -> NotesResul
                                                 language.get("exempt_keys") or [])
                   + language_mod.check_scores(kept))
     ]
+    # The proposal is carried out of the gate with the verdict. Keeping it is
+    # what lets a later, stricter gate be run over it without paying twice.
     return NotesResult(notes=kept, rejected=rejected, violations=violations,
-                       snapshot_hash=str(dossier.get("snapshot_hash") or ""))
+                       snapshot_hash=str(dossier.get("snapshot_hash") or ""),
+                       proposed=dict(payload or {}))
+
+
+def sentences(notes: dict) -> list[str]:
+    """Every sentence in a note set, flattened, for comparing two verdicts."""
+    out: list[str] = []
+    for key in ("headline", "summary", "catch"):
+        value = (notes or {}).get(key)
+        if isinstance(value, str) and value.strip():
+            out.append(value.strip())
+    for item in (notes or {}).get("watch") or []:
+        if isinstance(item, str) and item.strip():
+            out.append(item.strip())
+    for text in ((notes or {}).get("notes") or {}).values():
+        if isinstance(text, str) and text.strip():
+            out.append(text.strip())
+    return out
+
+
+def regate(stored: dict, dossier: dict, config: dict | None = None) -> NotesResult:
+    """Judge a proposal that has already been paid for, under today's rules.
+
+    The money was spent when the sentences were written; the rules that decide
+    which of them survive are ours and they change. Rerunning them is the same
+    free re-verification the documents profile gets from ``verify --all``, and
+    it is only possible because the proposal itself is on disk.
+
+    The cost recorded in the file is carried over untouched: a recheck spends
+    nothing, and it must not make the ledger's history of what was spent
+    disagree with the file that was paid for.
+    """
+    proposed = (stored or {}).get("proposed")
+    if not isinstance(proposed, dict) or not proposed:
+        raise LookupError(
+            "these notes were written before the proposal was kept on disk, so "
+            "there is nothing to judge again")
+    result = gate(proposed, dossier, config)
+    result.cost_usd = float((stored or {}).get("cost_usd") or 0.0)
+    return result
 
 
 # ------------------------------------------------------------------ on disk
