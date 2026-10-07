@@ -31,12 +31,17 @@ def _identity(facts: dict) -> list[str]:
     if name or symbol:
         both = " ".join(part for part in (name, f"({symbol})" if symbol else "")
                         if part)
-        lines += _wrap(f"the contract calls itself {both}", 2, "[chain]")
+        subject = "the mint" if facts.get("program") else "the contract"
+        lines += _wrap(f"{subject} calls itself {both}", 2, "[chain]")
     supply = facts.get("total_supply")
     if supply:
         decimals = facts.get("decimals")
         tail = f", {decimals} decimals" if decimals is not None else ""
         lines += _wrap(f"total supply {supply}{tail}", 2, "[chain]")
+    program = facts.get("program")
+    if program:
+        extensions = ", ".join(facts.get("extensions") or []) or "no extensions"
+        lines += _wrap(f"an SPL mint on the {program} program; {extensions}", 2, "[chain]")
     size = facts.get("code_size")
     if size:
         implementation = facts.get("implementation")
@@ -44,7 +49,7 @@ def _identity(facts: dict) -> list[str]:
                  if implementation else "")
         lines += _wrap(f"{size} bytes of deployed code{where}", 2, "[chain]")
     if not lines:
-        lines.append("  (the contract answered none of the ERC-20 name calls)")
+        lines.append("  (the token answered none of the name calls)")
     return lines
 
 

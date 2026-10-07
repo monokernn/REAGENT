@@ -478,6 +478,9 @@ def read_coin(config: dict, chain: str, address: str,
               chain_id: int | None = None, pool: str | None = None,
               rpc: Rpc | None = None) -> ChainReport:
     """Read every coin slot, or say why it could not be read."""
+    if chain == "solana":
+        from .solana import read_solana_coin
+        return read_solana_coin(config, address, pool=pool, rpc=rpc)
     if rpc is None:
         url = (config.get("rpc") or {}).get(chain)
         if not url:

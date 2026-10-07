@@ -370,18 +370,18 @@ class Asset:
 
     @property
     def ref(self) -> str:
-        return f"{self.chain}:{self.address.lower()}"
+        return f"{self.chain}:{norm_address(self.chain, self.address)}"
 
     def to_json(self) -> dict:
         return {
             "chain": self.chain,
             "chain_id": self.chain_id,
-            "address": self.address.lower(),
+            "address": norm_address(self.chain, self.address),
             "label": self.label,
             "profile": self.profile,
             "documents": [d.to_json() for d in self.documents],
             "reserves": dict(self.reserves),
-            "pool": (self.pool.lower() if self.pool else None),
+            "pool": (norm_address(self.chain, self.pool) if self.pool else None),
         }
 
 
@@ -397,15 +397,29 @@ CHAIN_IDS: dict[str, int] = {
 }
 
 
+SOLANA = "solana"
+
+
+def norm_address(chain: str, address: str) -> str:
+    """EVM addresses compare lowercased; Solana's base58 is case-sensitive."""
+    address = str(address).strip()
+    return address if str(chain).lower() == SOLANA else address.lower()
+
+
 def parse_ref(ref: str) -> tuple[str, str]:
-    """``ethereum:0xabc…`` -> ``("ethereum", "0xabc…")``."""
+    """``ethereum:0xabc…`` -> ``("ethereum", "0xabc…")``; ``solana:<mint>`` too."""
     if ":" not in ref:
         raise ValueError(f"expected <chain>:<address>, got {ref!r}")
     chain, address = ref.split(":", 1)
     chain = chain.strip().lower()
-    address = address.strip().lower()
+    address = norm_address(chain, address)
     if not chain:
         raise ValueError("empty chain")
+    if chain == SOLANA:
+        from .coin.solana import is_address
+        if not is_address(address):
+            raise ValueError(f"not a Solana address: {address!r}")
+        return chain, address
     if not (address.startswith("0x") and len(address) == 42):
         raise ValueError(f"not a 20-byte address: {address!r}")
     int(address, 16)  # raises on non-hex
@@ -488,14 +502,14 @@ def asset_from_toml(raw: dict) -> Asset:
                          'set profile = "rwa"')
     return Asset(
         chain=chain,
-        address=str(raw["address"]).lower(),
+        address=norm_address(chain, raw["address"]),
         label=str(raw.get("label") or raw["address"]),
         documents=docs,
         reserves=dict(raw.get("reserves", {}) or {}),
         alerts=dict(raw.get("alerts", {}) or {}),
         chain_id=raw.get("chain_id") or CHAIN_IDS.get(chain),
         profile=profile,
-        pool=(str(raw["pool"]).lower() if raw.get("pool") else None),
+        pool=(norm_address(chain, raw["pool"]) if raw.get("pool") else None),
     )
 
 
@@ -532,7 +546,7 @@ def asset_to_toml(asset: Asset) -> str:
             "# The pair this coin trades in. Nothing is discovered: without this",
             "# line the liquidity slot reads not_checked rather than guessing.",
             (f"pool = {_toml_str(asset.pool)}" if asset.pool
-             else '# pool = "0x…"'),
+             else '# pool = "<pool address>"'),
             "",
             "# Your numbers, not a judgement by the tool.",
             "# [alerts]",

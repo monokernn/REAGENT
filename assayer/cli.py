@@ -126,7 +126,7 @@ def cmd_add(args) -> int:
         for host in missing:
             out(f"  {host}")
         out("add them to [sources] allowed_domains in config.toml")
-    if not (util.load_config(p).get("rpc") or {}).get(chain):
+    if chain != model.SOLANA and not (util.load_config(p).get("rpc") or {}).get(chain):
         out("")
         out(f"no [rpc] {chain} in config.toml: on-chain slots will be "
             f"not_checked: missing_rpc_endpoint")

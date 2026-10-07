@@ -12,6 +12,7 @@ max_usd_per_day = 2.00
 max_usd_per_extraction = 0.40
 
 [rpc]
+# solana = "https://…"      # optional: public endpoints are used when unset
 # ethereum = "https://…"
 # arbitrum = "https://…"
 

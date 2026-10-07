@@ -1,6 +1,6 @@
 # REAGENT (RWA Evidence Agent)
 
-![tests](https://img.shields.io/badge/tests-142%20passing-2ea44f)
+![tests](https://img.shields.io/badge/tests-153%20passing-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
@@ -121,7 +121,7 @@ The tool produces a document; the person decides.
 | section | what is in it |
 |---|---|
 | [The crew](#the-crew) | eight agents, and which readings each one owns |
-| [Ordinary coins](#ordinary-coins) | the default profile: twelve readings, taken from bytecode alone |
+| [Ordinary coins](#ordinary-coins) | the default profile: twelve readings of a Solana mint, taken from the chain alone |
 | [Assets with documents](#assets-with-documents) | the gap this was built for, and a dossier in full |
 | [Start](#start) | install, configure, first snapshot |
 | [How it works](#how-it-works) | snapshot, extract, verify |
@@ -139,73 +139,79 @@ The tool produces a document; the person decides.
 A memecoin has no prospectus, no custodian and no reserve report. The legal
 questionnaire therefore has nothing to be filled from, and the paid role has
 nothing to read — so it is not started. Everything a holder can be told about one
-is a fact about bytecode and storage, and seven agents read it straight off the
-chain.
+is a fact about the chain, and seven agents read it straight off it.
+
+Solana is the default. A token there is a mint account on one of two shared
+programs, SPL Token or Token-2022, and what makes one token different from
+another is written into that account: who may print more, who may freeze a
+holder, and the Token-2022 extensions that take a fee on every transfer, move
+any holder's balance, pause the token or run a program on each transfer.
 
 ```bash
-assayer add robinhood:0xADDRESS --coin --label "$PONS" --pool 0xPAIR
-assayer snap robinhood-0xaddress
-assayer show robinhood-0xaddress
+assayer add solana:DEW9dSN6QpWyNthphCpMmAbZP1Q4cEKR9xQXAri98WDP --coin --label "$SI"
+assayer snap si
+assayer show si
 ```
+
+EVM chains are read the same way, from bytecode and storage instead of a mint:
+`assayer add ethereum:0xADDRESS --coin --pool 0xPAIR`.
 
 `--pool` is optional and nothing is discovered without it: a pool the asset file
 does not name is a pool this tool does not read, and the `liquidity` slot says so
-under `NOT CHECKED` rather than going looking. A declared pool is checked to be a
-pair for *this* token before a single number from it is believed.
+under `NOT CHECKED` rather than going looking.
 
 ### The twelve readings
 
-| slot | what is read |
-|---|---|
-| `ownership` | does the contract still answer to a live owner, and is it one key or a threshold |
-| `mint_authority` | can supply still be increased, and by whom |
-| `burn_authority` | can a balance the owner does not hold be reduced |
-| `pause` | can transfers be halted |
-| `freeze` | can one address be blocked from moving its balance |
-| `upgradeable` | can the logic be replaced in place, and after what delay |
-| `trading_switch` | can transfers be turned on or off after deployment |
-| `transfer_tax` | does a transfer pay a fee, and can that figure still be moved |
-| `transfer_limits` | per-transaction and per-wallet caps, as a share of supply |
-| `owner_holdings` | what share of supply sits in the owner's own balance |
-| `burned_supply` | what share sits at an address with no known key |
-| `liquidity` | how much of the token is in the declared pool, and how much of that pool's LP is parked |
+| slot | on Solana | on an EVM chain |
+|---|---|---|
+| `ownership` | every live authority over the mint, and which of them touch a balance | does the contract still answer to a live owner, one key or a threshold |
+| `mint_authority` | the mint authority: can supply still be increased, and by whom | the same, from the mint functions in the bytecode |
+| `burn_authority` | a permanent delegate that can move or burn any holder's balance | can a balance the owner does not hold be reduced |
+| `pause` | the pausable extension and its authority | can transfers be halted |
+| `freeze` | the freeze authority over every holder's token account | can one address be blocked from moving its balance |
+| `upgradeable` | a transfer hook: a program every transfer runs, and who can repoint it | can the logic be replaced in place, and after what delay |
+| `trading_switch` | accounts that start frozen, or a token that cannot be transferred | can transfers be turned on or off after deployment |
+| `transfer_tax` | the transfer fee extension: basis points, cap, and who can change it | does a transfer pay a fee, and can that figure still be moved |
+| `transfer_limits` | the token programs keep none | per-transaction and per-wallet caps, as a share of supply |
+| `owner_holdings` | what share of supply the live authority holds | what share of supply sits in the owner's own balance |
+| `burned_supply` | what share sits at the incinerator | what share sits at an address with no known key |
+| `liquidity` | how much of the token the declared pool owns | how much is in the declared pool, and how much of its LP is parked |
 
-Six of them are the documents profile's own power slots, reused rather than
-reimplemented: Clasp asks the same questions of the same bytecode whichever
-profile called it.
+Clasp asks the same nine questions whichever chain the token lives on; only the
+place the answer is written changes.
 
 ### What the sheet looks like
 
 ```
-ASSAY  ·  COIN  ·  $PONS  ·  ethereum:0x1111…  ·  2026-09-16
+ASSAY  ·  COIN  ·  $SI  ·  solana:DEW9dSN6QpWyNthphCpMmAbZP1Q4cEKR9xQXAri98WDP  ·  2026-10-07
 
-! Powers over somebody else's balance are live in this contract: ownership,
-mint_authority, trading_switch, transfer_tax, transfer_limits.
+! Powers over somebody else's balance are live in this contract: ownership, transfer_tax.
 
 WHAT THIS IS
-  the contract calls itself Pons (PONS)                                    [chain]
-  total supply 1000000000000000000000000000, 18 decimals                   [chain]
+  the mint calls itself Super Inu (SI)                                                   [chain]
+  total supply 996393517508835, 6 decimals                                               [chain]
+  an SPL mint on the token-2022 program; metadataPointer, tokenMetadata,                 [chain]
+  transferFeeConfig
 
 WHAT THE CONTRACT STILL ALLOWS
-  ⚠ ownership: the contract still answers to an owner:     [chain, block 21000000]
-  0x2222… (EOA: a single key, no on-chain threshold); the position can be
-  passed on: transferOwnership(address)
-  ○ freeze: no address-level freeze or blacklist function [absence, block 21000000]
-  in the deployed code
-  ⚠ transfer_tax: a cut is taken on transfer: totalFees()  [chain, block 21000000]
-  reads 5; the figure can be moved after deployment: setFees(uint256,uint256);
-  the contract does not declare the unit of these figures, so they are printed
-  as read
-  · liquidity: 25.0% of supply sits in the declared pool   [chain, block 21000000]
-  0x4444…; 96.0% of the pool's own LP token is parked at an address with no
-  known key
+  ⚠ ownership: the mint still answers to live authorities — fee:        [chain, block 454318633]
+  5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD; metadata:
+  WLHv2UAZm6z4KyaaELi5pjdbJh6RESMva1Rnn8pJVVh
+  ○ mint_authority: mint authority is set to none: the supply is fixed  [chain, block 454318633]
+  ○ freeze: freeze authority is set to none: no holder's account can    [chain, block 454318633]
+  be frozen
+  ⚠ transfer_tax: a transfer pays 100 basis points (1%); the rate can   [chain, block 454318633]
+  be changed by 5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD; the
+  withheld fees are collected by
+  5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD
+  · owner_holdings: 5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD holds  [chain, block 454318633]
+  0.0076% of supply
 
-THRESHOLDS SET IN THE ASSET FILE
-  ⚠ the owner address holds 5.0% of supply, threshold is 1.0%          [asset file]
-  (threshold crossed)
+NOT CHECKED
+  ? liquidity: no_pool_declared. no pool in the asset file; pools are never discovered
 
-COMPLETENESS: 8/12 slots   POWERS LIVE: 5   SPENT: $0.0000
-snapshot 87f45d9533ed  ·  no extraction: this profile calls no model  ·  block 21000000
+COMPLETENESS: 4/12 slots   POWERS LIVE: 2   SPENT: $0.0000
+snapshot 314b255b8d9f  ·  no extraction: this profile calls no model  ·  block 454318633
 This sheet shows what the contract records. The person decides.
 ```
 There is no score and no verdict, for the same reason as everywhere else in this
@@ -261,9 +267,9 @@ The sheet is twelve readings and no prose. `assayer notes` adds the prose, and
 it is the one coin command that can cost anything:
 
 ```bash
-assayer notes robinhood-0xaddress     # calls the agent CLI named in config.toml
-assayer notes robinhood-0xaddress --recheck  # judge what was written, free
-assayer show robinhood-0xaddress --notes   # prints what was already written, free
+assayer notes si              # calls the agent CLI named in config.toml
+assayer notes si --recheck    # judge what was written, free
+assayer show si --notes       # prints what was already written, free
 ```
 
 The writing goes through the same agent CLI the documents profile uses, on your
@@ -325,7 +331,7 @@ freeze any address and replace the logic with no delay. All of it is public, and
 none of it gets read: the documents are long, the contracts are unreadable by
 eye, and both change quietly. REAGENT works in that gap.
 
-**A live illustration.** Robinhood Stock Tokens: the interface shows the ticker
+**A live illustration.** Tokenised stocks on Solana: the interface shows the ticker
 and the price of a familiar company, while the prospectus describes tokenised
 debt securities of an issuer incorporated in Jersey. They give economic exposure
 to the price of the underlying share, but they do not make the holder a
@@ -475,17 +481,14 @@ git clone https://github.com/monokernn/REAGENT.git reagent && cd reagent
 pip install -e .
 ```
 
-A coin needs one line of configuration — an RPC endpoint for its chain:
-
-```toml
-[rpc]
-robinhood = "https://…"
-```
+A coin on Solana needs no configuration: public endpoints are read unless
+`[rpc] solana` in `config.toml` names your own. A coin on an EVM chain needs one
+line, an RPC endpoint for that chain.
 
 ```bash
 assayer doctor
-assayer add robinhood:0xADDRESS --coin --label "$PONS" --pool 0xPAIR
-assayer snap robinhood-0xaddress
+assayer add solana:DEW9dSN6QpWyNthphCpMmAbZP1Q4cEKR9xQXAri98WDP --coin --label "$SI"
+assayer snap si
 ```
 
 That is the whole loop for the coin profile. It calls no model and spends
@@ -760,7 +763,7 @@ and safe against concurrent writers.
 ## Requirements
 
 - Python 3.10+
-- an RPC endpoint per observed chain, read-only
+- an RPC endpoint per observed EVM chain, read-only; Solana runs on public endpoints
 - `pypdf` for PDFs, and `tomli` on 3.10; both install with the package
 - any agent CLI on PATH, optional
 
