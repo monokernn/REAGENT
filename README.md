@@ -7,6 +7,11 @@
 **REAGENT (RWA Evidence Agent)** reads a token and writes one sheet on which
 every line names the function, the block or the page it came from.
 
+**A Grok Bot crew.** REAGENT is built the way a Grok Bot team is built: eight
+bots, one job each, a lead that fuses their work, and one shared set of
+evidence for all of them. On the hosted desk every agent is one of the Grok Bot
+mascots, from Slate's black ball to Crucible's orange blob.
+
 The work is divided among a crew of agents. Each owns one question, is handed
 only the evidence that bears on it, and answers from that alone. They do not
 talk to each other: a snapshot is collected once, before any of them answers, and
