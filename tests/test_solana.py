@@ -187,3 +187,13 @@ def test_the_reader_never_asks_for_anything_but_reads():
     rpc = sol.SolanaRpc(urls=[])
     with pytest.raises(Exception, match="not permitted"):
         rpc.call("sendTransaction", ["…"])
+
+
+def test_an_endpoint_key_never_reaches_the_error_message():
+    rpc = sol.SolanaRpc(urls=["http://127.0.0.1:9/?api-key=SECRET123",
+                              "http://127.0.0.1:9/SECRET456/"], timeout_s=0.5)
+    with pytest.raises(Exception) as caught:
+        rpc.call("getSlot", [])
+    message = str(caught.value)
+    assert "SECRET" not in message
+    assert "http://127.0.0.1" in message

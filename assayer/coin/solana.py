@@ -23,6 +23,7 @@ import base64
 import hashlib
 import json
 import struct
+import urllib.parse
 import urllib.request
 from typing import Any
 
@@ -174,6 +175,16 @@ def parse_metaplex(raw: bytes) -> dict:
 
 # ----------------------------------------------------------------- rpc
 
+def _host(url: str) -> str:
+    """The endpoint as an error message may print it: scheme and host only.
+
+    Paid endpoints carry their key in the query (Helius) or the path
+    (QuickNode), and an error message ends up on the sheet and in logs.
+    """
+    parts = urllib.parse.urlsplit(url)
+    return f"{parts.scheme}://{parts.hostname}" if parts.hostname else "endpoint"
+
+
 class SolanaRpc:
     """JSON-RPC over the first endpoint that answers, read-only methods only."""
 
@@ -199,14 +210,14 @@ class SolanaRpc:
                 with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
                     body = json.loads(response.read().decode("utf-8"))
             except Exception as exc:                # noqa: BLE001 — try the next one
-                errors.append(f"{url}: {type(exc).__name__}: {exc}")
+                errors.append(f"{_host(url)}: {type(exc).__name__}: {exc}")
                 continue
             if isinstance(body, dict) and body.get("error"):
-                errors.append(f"{url}: {body['error']}")
+                errors.append(f"{_host(url)}: {body['error']}")
                 continue
             if isinstance(body, dict) and "result" in body:
                 return body["result"]
-            errors.append(f"{url}: malformed response")
+            errors.append(f"{_host(url)}: malformed response")
         raise RpcError(" | ".join(errors) or "no endpoint configured")
 
 
