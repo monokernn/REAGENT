@@ -20,6 +20,13 @@ from assayer.keccak import keccak256                               # noqa: E402
 from assayer.snapshot import chain as chain_mod                    # noqa: E402
 from assayer.snapshot import docs as docs_mod                      # noqa: E402
 
+@pytest.fixture(autouse=True)
+def _no_reagent_model(monkeypatch):
+    """Tests choose their model explicitly; the developer's environment never leaks in."""
+    for name in ("REAGENT_MODEL_URL", "REAGENT_MODEL_KEY", "REAGENT_MODEL"):
+        monkeypatch.delenv(name, raising=False)
+
+
 CONFIG_TEMPLATE = """
 [agent]
 command = "no-such-agent-cli"

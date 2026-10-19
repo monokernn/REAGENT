@@ -2,9 +2,9 @@
 
 A coin sheet is twelve readings and no sentences. These are the sentences, and
 they are optional, because the readings are the evidence and the prose is not.
-The agent that writes them is the one named in ``[agent]``, the same command the
-documents profile shells out to, on the reader's own key. Nothing here talks to
-a vendor directly.
+They are written by REAGENT's own model (``[model]``), or by the CLI named in
+``[agent]`` where that model is not configured: the same call the documents
+profile makes, through ``extract.agent``. Nothing here talks to a vendor directly.
 
 Three things keep prose from quietly becoming a second, softer source of truth.
 

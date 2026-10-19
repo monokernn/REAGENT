@@ -1,6 +1,6 @@
 # REAGENT (RWA Evidence Agent)
 
-![tests](https://img.shields.io/badge/tests-154%20passing-2ea44f)
+![tests](https://img.shields.io/badge/tests-158%20passing-2ea44f)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 
@@ -11,6 +11,9 @@ every line names the function, the block or the page it came from.
 bots, one job each, a lead that fuses their work, and one shared set of
 evidence for all of them. On the hosted desk every agent is one of the Grok Bot
 mascots, from Slate's black ball to Crucible's orange blob.
+
+The crew's notes and Docket's extraction run on REAGENT's own model, trained for
+this questionnaire and wired in behind the same gate as everything else.
 
 The work is divided among a crew of agents. Each owns one question, is handed
 only the evidence that bears on it, and answers from that alone. They do not
@@ -770,12 +773,31 @@ and safe against concurrent writers.
 - Python 3.10+
 - an RPC endpoint per observed EVM chain, read-only; Solana runs on public endpoints
 - `pypdf` for PDFs, and `tomli` on 3.10; both install with the package
-- any agent CLI on PATH, optional
+- access to the REAGENT model, or any agent CLI on PATH, optional
 
-Docket and the coin notes shell out to whatever agent CLI is declared in
-`config.toml`, on your own key — a language model of your choosing, not one wired
-in here. Anything that accepts a prompt and returns JSON will do, and swapping it
-is a change of four lines.
+Docket and the coin notes run on REAGENT's own model. `[model]` selects it, and
+where it is served comes from the environment, so no endpoint or key is ever
+written into a file in this repository:
+
+```toml
+[model]
+provider = "reagent"
+temperature = 0
+```
+
+```bash
+export REAGENT_MODEL_URL="https://…/v1"   # an OpenAI-compatible base URL
+export REAGENT_MODEL_KEY="…"
+export REAGENT_MODEL="reagent"
+```
+
+With those three set, every model call in the package goes to it: one chat
+completion per extraction or set of notes, through `assayer/extract/agent.py`.
+Add `usd_per_mtok_in` and `usd_per_mtok_out` under `[model]` and the budget ledger
+prices each call from the token counts it returns.
+
+Where `REAGENT_MODEL_URL` is unset, the same calls go to the agent CLI declared in
+`[agent]`. Anything that accepts a prompt and returns JSON will do:
 
 ```toml
 [agent]
@@ -785,7 +807,7 @@ response_field = "result"
 cost_field = "total_cost_usd"
 ```
 
-With no CLI installed every reading still runs: `snap`, `verify`, `diff`, `show`
+With neither configured, every reading still runs: `snap`, `verify`, `diff`, `show`
 and `watch` work in full and a coin sheet prints complete. Only `extract` and
 `notes` report themselves unavailable and return code 6.
 

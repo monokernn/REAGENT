@@ -297,6 +297,7 @@ def paths(start: Path | None = None) -> Paths:
 
 
 DEFAULT_CONFIG: dict = {
+    "model": {"provider": "reagent", "temperature": 0, "timeout_s": 600},
     "agent": {
         "command": "claude",
         "args": ["-p", "--output-format", "json"],

@@ -1,8 +1,14 @@
 """The one place in this codebase where a model is invoked.
 
-Any agent CLI that takes a prompt and prints JSON will do: ``[agent]`` in
-``config.toml`` names the command, its arguments, and the two fields to read the
-response and the cost out of. Nothing else in the package shells out to a model,
+REAGENT runs on its own model. ``[model]`` in ``config.toml`` selects it with
+``provider = "reagent"``; where it is served and with which key comes from the
+environment (``REAGENT_MODEL_URL``, ``REAGENT_MODEL_KEY``, ``REAGENT_MODEL``), so
+neither ever sits in a file in this repository. It is spoken to over the
+OpenAI-compatible chat API that every serving stack offers.
+
+Where that environment is not set, any agent CLI that takes a prompt and prints
+JSON will do: ``[agent]`` names the command, its arguments, and the two fields to
+read the response and the cost out of. Nothing else in the package calls a model,
 so "did this cost money" is answerable by reading one file.
 
 Without such a CLI installed, ``snap``, ``verify``, ``diff`` and ``show`` all
@@ -12,8 +18,12 @@ work; only ``extract`` reports itself unavailable.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
+import urllib.error
+import urllib.parse
+import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -51,6 +61,106 @@ class ExtractResult:
     raw_responses: list[str] = field(default_factory=list)
 
 
+# ------------------------------------------------------------- REAGENT model
+
+MODEL_PROVIDER = "reagent"
+MODEL_URL_ENV = "REAGENT_MODEL_URL"
+MODEL_KEY_ENV = "REAGENT_MODEL_KEY"
+MODEL_NAME_ENV = "REAGENT_MODEL"
+DEFAULT_MODEL_NAME = "reagent"
+
+
+@dataclass
+class ModelSettings:
+    url: str
+    key: str | None
+    name: str
+    temperature: float
+    timeout_s: float
+    usd_per_mtok_in: float
+    usd_per_mtok_out: float
+
+
+def model_settings(config: dict) -> ModelSettings | None:
+    """REAGENT's own model, when ``[model]`` selects it and it has an endpoint."""
+    model = config.get("model") or {}
+    if str(model.get("provider") or "").strip().lower() != MODEL_PROVIDER:
+        return None
+    url = (os.environ.get(MODEL_URL_ENV) or str(model.get("url") or "")).strip()
+    if not url:
+        return None
+    return ModelSettings(
+        url=url.rstrip("/"),
+        key=os.environ.get(MODEL_KEY_ENV) or None,
+        name=(os.environ.get(MODEL_NAME_ENV) or str(model.get("name") or "")
+              or DEFAULT_MODEL_NAME).strip(),
+        temperature=float(model.get("temperature", 0)),
+        timeout_s=float(model.get("timeout_s", 600)),
+        usd_per_mtok_in=float(model.get("usd_per_mtok_in", 0) or 0),
+        usd_per_mtok_out=float(model.get("usd_per_mtok_out", 0) or 0),
+    )
+
+
+def _host(url: str) -> str:
+    """What an error message may print of the endpoint: scheme and host."""
+    parts = urllib.parse.urlsplit(url)
+    if not parts.hostname:
+        return "endpoint"
+    port = f":{parts.port}" if parts.port else ""
+    return f"{parts.scheme}://{parts.hostname}{port}"
+
+
+def call_model(settings: ModelSettings, prompt_text: str) -> AgentCall:
+    """One chat completion from REAGENT's model, with the prompt as the user turn."""
+    import time
+
+    body = json.dumps({
+        "model": settings.name,
+        "messages": [{"role": "user", "content": prompt_text}],
+        "temperature": settings.temperature,
+    }).encode("utf-8")
+    headers = {"Content-Type": "application/json", "User-Agent": "assayer (reagent model)"}
+    if settings.key:
+        headers["Authorization"] = f"Bearer {settings.key}"
+    endpoint = settings.url if settings.url.endswith("/chat/completions") \
+        else settings.url + "/chat/completions"
+    request = urllib.request.Request(endpoint, data=body, headers=headers, method="POST")
+    started = time.monotonic()
+    try:
+        with urllib.request.urlopen(request, timeout=settings.timeout_s) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        raise AgentFailed(f"REAGENT model at {_host(settings.url)} answered "
+                          f"HTTP {exc.code}") from None
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        reason = getattr(exc, "reason", exc)
+        raise AgentUnavailable(f"REAGENT model at {_host(settings.url)} is unreachable: "
+                               f"{type(reason).__name__}") from None
+    duration = time.monotonic() - started
+    try:
+        payload = json.loads(raw)
+        text = payload["choices"][0]["message"]["content"]
+    except (json.JSONDecodeError, KeyError, IndexError, TypeError):
+        raise AgentFailed(f"REAGENT model at {_host(settings.url)} returned "
+                          f"no completion") from None
+    usage = payload.get("usage") or {}
+    cost = (float(usage.get("prompt_tokens") or 0) * settings.usd_per_mtok_in
+            + float(usage.get("completion_tokens") or 0) * settings.usd_per_mtok_out) / 1e6
+    return AgentCall(response=str(text or ""), cost_usd=round(cost, 6), raw_stdout=raw,
+                     duration_s=duration, command=[MODEL_PROVIDER, settings.name])
+
+
+def model_meta(config: dict) -> dict:
+    """What an extraction records about the model that produced it."""
+    settings = model_settings(config)
+    if settings is not None:
+        return {"provider": MODEL_PROVIDER, "model": settings.name}
+    agent = config.get("agent") or {}
+    return {"command": agent.get("command"), "args": list(agent.get("args") or [])}
+
+
+# ------------------------------------------------------------- agent CLI
+
 def agent_command(config: dict) -> list[str]:
     agent = config.get("agent") or {}
     command = str(agent.get("command") or "").strip()
@@ -61,6 +171,9 @@ def agent_command(config: dict) -> list[str]:
 
 
 def agent_available(config: dict) -> tuple[bool, str]:
+    settings = model_settings(config)
+    if settings is not None:
+        return True, f"REAGENT model {settings.name} at {_host(settings.url)}"
     try:
         command = agent_command(config)
     except AgentUnavailable as exc:
@@ -72,6 +185,14 @@ def agent_available(config: dict) -> tuple[bool, str]:
 
 
 def call_agent(config: dict, prompt_text: str) -> AgentCall:
+    """Ask REAGENT's model when it is configured, otherwise the agent CLI."""
+    settings = model_settings(config)
+    if settings is not None:
+        return call_model(settings, prompt_text)
+    return _call_cli(config, prompt_text)
+
+
+def _call_cli(config: dict, prompt_text: str) -> AgentCall:
     """Run the configured CLI with the prompt on stdin."""
     import time
 
@@ -160,8 +281,7 @@ def run(p: util.Paths, config: dict, asset: Asset, snapshot: dict, *,
                          "exactly, with no prose.\n")
 
     slots = parsed.slots if parsed else []
-    agent_meta = {"command": (config.get("agent") or {}).get("command"),
-                  "args": list((config.get("agent") or {}).get("args") or [])}
+    agent_meta = model_meta(config)
     ehash = schema_mod.extraction_hash(str(snapshot.get("snapshot_hash")),
                                       built.hash, slots, agent_meta)
     extraction = {

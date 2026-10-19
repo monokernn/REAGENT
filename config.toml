@@ -1,5 +1,14 @@
 # REAGENT configuration. Every network destination is listed here by hand.
 
+[model]
+# REAGENT's own model. Where it is served and the key are read from the
+# environment, never from this file: REAGENT_MODEL_URL (an OpenAI-compatible
+# base URL), REAGENT_MODEL_KEY, and REAGENT_MODEL for the model name.
+provider = "reagent"
+temperature = 0
+timeout_s = 600
+
+# Used when REAGENT_MODEL_URL is unset: any CLI that takes a prompt and prints JSON.
 [agent]
 command = "claude"
 args = ["-p", "--output-format", "json"]
