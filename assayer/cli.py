@@ -914,6 +914,14 @@ def _probe(url: str, allowed: list[str], timeout: float) -> str:
         return f"{type(exc).__name__}: {exc}"
 
 
+# ---------------------------------------------------------------- mcp
+
+def cmd_mcp(args) -> int:
+    """Serve the readings to an agent over MCP on stdin and stdout."""
+    from . import mcp as mcp_mod
+    return mcp_mod.serve(getattr(args, "home", None))
+
+
 # ---------------------------------------------------------------- parser
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1021,6 +1029,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help="re-hash every stored document against its own name")
     doctor.add_argument("--timeout", type=float, default=15.0)
     doctor.set_defaults(func=cmd_doctor)
+
+    mcp = sub.add_parser("mcp", help="serve the readings to an agent over MCP (stdio)")
+    mcp.set_defaults(func=cmd_mcp)
 
     return parser
 
