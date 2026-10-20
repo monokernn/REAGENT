@@ -5,11 +5,12 @@ call tools a local program offers. This module offers the readings: the same
 reader the CLI snapshots with, the same slots, the same evidence, handed over as
 JSON-RPC on stdin and stdout so nothing has to be installed beside the package.
 
-Three tools, all read-only:
+Four tools, all read-only:
 
-    read_token     read a token from its contract now; nothing is stored
-    list_assets    the assets registered in this project
-    show_dossier   the latest sheet written for one of them
+    read_token       read a token from its contract now; nothing is stored
+    holder_clusters  the largest wallets of a Solana token, grouped by who funded them
+    list_assets      the assets registered in this project
+    show_dossier     the latest sheet written for one of them
 
 An agent gets what a person gets: every reading with the call it came from and
 the block or slot it was read at, and readings that could not be taken marked
@@ -66,6 +67,25 @@ TOOLS = [
                 "pool": {"type": "string",
                          "description": "optional: the pool the token trades in; "
                                         "without it liquidity reads not_checked"},
+            },
+            "required": ["address"],
+            "additionalProperties": False,
+        },
+        "annotations": {**READ_ONLY, "openWorldHint": True},
+    },
+    {
+        "name": "holder_clusters",
+        "title": "Holder clusters of a Solana token",
+        "description": (
+            "The 100 largest wallets of a Solana token, grouped into clusters by the "
+            "address that first funded each one with SOL, or where one holder funded "
+            "another. Each cluster comes with the share of supply it holds and the "
+            "funder that joins it. Exchanges and busy hubs are listed apart. Funding "
+            "addresses are reported by Jupiter; supply is read from the chain."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "address": {"type": "string", "description": "the token's mint address"},
             },
             "required": ["address"],
             "additionalProperties": False,
@@ -191,6 +211,45 @@ def read_token(config: dict, address: str, chain: str = model.SOLANA,
     return _text(chain, address, report), data
 
 
+def _pct(value: float) -> str:
+    return f"{value:.2f}%" if value >= 0.01 else f"{value:.4f}%"
+
+
+def holder_clusters(config: dict, address: str, rpc=None, holders=None) -> tuple[str, dict]:
+    from .coin import clusters as clusters_mod
+    from .coin.solana import DEFAULT_RPCS, SolanaRpc, is_address
+    if rpc is None:
+        configured = (config.get("rpc") or {}).get(model.SOLANA)
+        urls = [configured] if isinstance(configured, str) and configured else []
+        rpc = SolanaRpc(urls + [u for u in DEFAULT_RPCS if u not in urls])
+    address = str(address).strip()
+    if not is_address(address):
+        raise ToolError(f"not a Solana mint address: {address!r}")
+    data = clusters_mod.read_clusters(address, rpc=rpc, holders=holders)
+    if not data["sample"]:
+        raise ToolError(f"{clusters_mod.SOURCE} returned no holders for {address}")
+    lines = [f"REAGENT  ·  holder clusters  ·  solana:{address}",
+             f"  the {data['sample']} largest wallets and the address that first funded each, "
+             f"reported by {data['source']}", ""]
+    found = data["clusters"]
+    lines.append(f"CLUSTERS: {len(found)}  ·  {data['clustered_wallets']} wallets"
+                 + (f"  ·  largest holds {_pct(data['largest_cluster_pct'])} of supply" if found else ""))
+    for i, cluster in enumerate(found, 1):
+        via = ", ".join(_short(f) for f in cluster["funded_from"]) or "a holder in the cluster"
+        lines.append(f"  {i} · {len(cluster['wallets'])} wallets · {_pct(cluster['share_pct'])} · "
+                     f"funded from {via}")
+        lines.append("      " + "   ".join(f"{_short(w['address'])} {_pct(w['share_pct'])}"
+                                          for w in cluster["wallets"][:6])
+                     + ("   …" if len(cluster["wallets"]) > 6 else ""))
+    if data["hubs"]:
+        lines += ["", "FUNDED THROUGH EXCHANGES AND HUBS"]
+        lines += [f"  {h['label']} {_short(h['address'])} · {h['funded_wallets']} wallets"
+                  for h in data["hubs"]]
+    if data["set_apart_pct"]:
+        lines += ["", "SET APART: " + ", ".join(f"{k} {_pct(v)}" for k, v in data["set_apart_pct"].items())]
+    return "\n".join(lines), data
+
+
 def list_assets(p: util.Paths) -> tuple[str, dict]:
     from .verify import gate as gate_mod
     assets = model.list_assets(p)
@@ -222,8 +281,9 @@ def show_dossier(p: util.Paths, asset: str) -> tuple[str, dict]:
 class Server:
     """One MCP session over newline-delimited JSON-RPC 2.0."""
 
-    def __init__(self, paths: Callable[[], util.Paths], config: Callable[[], dict], rpc=None):
-        self._paths, self._config, self.rpc = paths, config, rpc
+    def __init__(self, paths: Callable[[], util.Paths], config: Callable[[], dict], rpc=None,
+                 holders=None):
+        self._paths, self._config, self.rpc, self.holders = paths, config, rpc, holders
 
     def handle(self, message: Any) -> dict | None:
         if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
@@ -261,6 +321,11 @@ class Server:
                 text, data = read_token(self._config(), str(args["address"]),
                                         str(args.get("chain") or model.SOLANA),
                                         args.get("pool"), rpc=self.rpc)
+            elif name == "holder_clusters":
+                if not args.get("address"):
+                    raise ToolError("address is required")
+                text, data = holder_clusters(self._config(), str(args["address"]), rpc=self.rpc,
+                                             holders=self.holders)
             elif name == "list_assets":
                 text, data = list_assets(self._paths())
             elif name == "show_dossier":

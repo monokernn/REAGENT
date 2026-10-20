@@ -6,7 +6,7 @@
 
 **RWA Evidence Agent.** Reads a token and writes one sheet on which every line names the function, the block or the page it came from.
 
-![tests](https://img.shields.io/badge/tests-166%20passing-2ea44f)
+![tests](https://img.shields.io/badge/tests-170%20passing-2ea44f)
 ![MCP](https://img.shields.io/badge/MCP-server-8a5cf6)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
@@ -63,10 +63,11 @@ If the app cannot see your `PATH`, give the full path to the executable (on Wind
 | tool | what the agent gets |
 |---|---|
 | `read_token` | the token read from the chain right now: all twelve readings, the agent that owns each, and the call it came from. Solana, or an EVM chain with an `[rpc]` entry |
+| `holder_clusters` | the 100 largest wallets of a Solana token, grouped by the address that first funded each, with the share of supply every cluster holds. Exchanges and busy hubs listed apart. Funding addresses reported by Jupiter |
 | `list_assets` | the assets registered in the project, and how many sheets each has |
 | `show_dossier` | the latest sheet for one of them, as `assayer show` prints it |
 
-All three are read-only and free. What the agent receives for a live token (abridged):
+All four are read-only and free. What the agent receives for a live token (abridged):
 
 ```
 REAGENT  ·  solana:DEW9dSN6QpWyNthphCpMmAbZP1Q4cEKR9xQXAri98WDP  ·  slot 459269815
@@ -383,7 +384,7 @@ Exit codes: `0` ok · `1` error · `2` usage · `3` gate stopped the run · `4` 
 
 ```bash
 pip install -e ".[dev]"
-python -m pytest -q        # 166 passing
+python -m pytest -q        # 170 passing
 ```
 
 | file | subject |
@@ -393,7 +394,7 @@ python -m pytest -q        # 166 passing
 | `test_artifacts.py` `test_states.py` `test_infra.py` | byte-identical dossiers, failed RPC, budgets, exit codes |
 | `test_coin.py` `test_solana.py` | the coin profile end to end, and a Solana mint read field by field |
 | `test_crew.py` `test_notes.py` | the roster against the slot vocabulary, the figure check |
-| `test_mcp.py` | the MCP server: read-only tools, every reading with its call |
+| `test_mcp.py` | the MCP server: read-only tools, every reading with its call, holder clusters |
 | `test_drift.py` `test_scans.py` `test_alerts.py` `test_challenge.py` `test_scars_registry.py` `test_extract.py` | diff quality, scans, thresholds, the adversarial mandate, the registry, the paid role through a real subprocess |
 
 ---

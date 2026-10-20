@@ -56,7 +56,7 @@ def test_the_handshake_names_reagent_and_offers_tools(tmp_path):
 
 def test_every_tool_is_declared_read_only(tmp_path):
     tools = server(tmp_path).handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})["result"]["tools"]
-    assert {t["name"] for t in tools} == {"read_token", "list_assets", "show_dossier"}
+    assert {t["name"] for t in tools} == {"read_token", "holder_clusters", "list_assets", "show_dossier"}
     for tool in tools:
         assert tool["annotations"]["readOnlyHint"] is True
         assert tool["annotations"]["destructiveHint"] is False
@@ -130,3 +130,92 @@ def test_a_session_runs_over_stdio_one_line_per_message(tmp_path):
     assert [r.get("id") for r in replies] == [1, 2, None]
     assert replies[1]["result"]["structuredContent"]["facts"]["name"] == "Super Inu"
     assert replies[2]["error"]["code"] == mcp.PARSE_ERROR
+
+
+# ---------------------------------------------------------------- holder clusters
+
+MINT = FEE_MINT
+# wallets that have signed transactions, so they sit on the curve like any holder
+W1 = "9W575thhzDifUfgkwS4UVE1VAnQ7PLR7LLSyot14xVuK"
+W2 = "8JdwN6FddHNfdr238TsAERAHWseCTw6mkpvWaBmwC8uC"
+W3 = "HTVZVEQMBsNanubDPTs3CxDAEGNFQHJY8c1441iy2S5r"
+W4 = "DepjZCVRSAxc4mrfQ2e6NYtTpMpHJoWkP6gyfGwJJ73k"
+FUNDER = "5KXDF6QnqhBj72hDtJNkkpFaQVUfbFXNybMsp3DiK6tD"
+BUSY = "G" * 43 + "g"
+BINANCE = "5tzFkiKscXHK5ZXCGbXZxdw7gTjjD1mBwuoFbhUvuAi9"
+POOL = "Bbru5XAuLKEY7E3cvVcddwa7imHoAQoX2yEBGgBKKfGo"
+
+
+class ClusterChain:
+    """Supply, and how busy an address is: the two things asked of the chain."""
+
+    def __init__(self, busy=()):
+        self.busy = set(busy)
+        self.calls = []
+
+    def call(self, method, params):
+        self.calls.append(method)
+        if method == "getTokenSupply":
+            return {"value": {"uiAmountString": "1000"}}
+        if method == "getSignaturesForAddress":
+            many = params[0] in self.busy
+            if many:
+                return [{"blockTime": 2000}] + [{"blockTime": 1500}] * 998 + [{"blockTime": 1000}]
+            return [{"blockTime": 2000}]
+        raise AssertionError(method)
+
+
+def jupiter(*rows):
+    def holders(_mint):
+        return {"holders": [{"address": a, "amount": amount, "tags": tags,
+                             "addressInfo": {"fundingAddress": funder}} for a, amount, funder, tags in rows]}
+    return holders
+
+
+def clusters_server(tmp_path, holders, busy=()):
+    (tmp_path / "assets").mkdir(exist_ok=True)
+    return mcp.Server(lambda: util.Paths(tmp_path), lambda: {}, rpc=ClusterChain(busy), holders=holders)
+
+
+def test_wallets_with_one_funder_are_one_cluster_with_their_share_of_supply(tmp_path):
+    holders = jupiter((POOL, 300, None, [{"id": "Pool", "name": "Pumpfun AMM Liquidity Pool"}]),
+                      (W1, 60, FUNDER, []), (W2, 40, FUNDER, []), (W3, 10, W2, []), (W4, 5, None, []))
+    result = call(clusters_server(tmp_path, holders), "holder_clusters", address=MINT)
+    assert result["isError"] is False
+    data = result["structuredContent"]
+    assert data["source"] == "jupiter" and data["supply"] == 1000.0 and data["sample"] == 5
+    assert len(data["clusters"]) == 1
+    cluster = data["clusters"][0]
+    assert [w["address"] for w in cluster["wallets"]] == [W1, W2, W3]
+    assert cluster["share_pct"] == 11.0 and cluster["funded_from"] == [FUNDER]
+    assert data["set_apart_pct"] == {"pool": 30.0}
+    text = result["content"][0]["text"]
+    assert "CLUSTERS: 1  ·  3 wallets  ·  largest holds 11.00% of supply" in text
+    assert "reported by jupiter" in text
+
+
+def test_an_exchange_or_a_busy_funder_is_listed_apart_and_joins_nobody(tmp_path):
+    holders = jupiter((W1, 50, BINANCE, []), (W2, 40, BINANCE, []), (W3, 30, BUSY, []), (W4, 20, BUSY, []))
+    data = call(clusters_server(tmp_path, holders, busy=[BUSY]), "holder_clusters", address=MINT)["structuredContent"]
+    assert data["clusters"] == []
+    assert {h["address"]: h["label"] for h in data["hubs"]} == {BINANCE: "Binance", BUSY: "busy hub"}
+
+
+def test_clusters_are_read_on_solana_and_carry_no_verdict(tmp_path):
+    srv = clusters_server(tmp_path, jupiter((W1, 60, FUNDER, []), (W2, 40, FUNDER, [])))
+    bad = call(srv, "holder_clusters", address="0x" + "ab" * 20)
+    assert bad["isError"] is True and "Solana mint" in bad["content"][0]["text"]
+    text = call(srv, "holder_clusters", address=MINT)["content"][0]["text"]
+    for word in FORBIDDEN:
+        assert not re.search(rf"\b{re.escape(word)}\b", text, re.IGNORECASE), word
+
+
+def test_the_solana_client_reads_signatures_and_still_refuses_to_send():
+    assert "getSignaturesForAddress" in sol.READ_ONLY_METHODS
+    client = sol.SolanaRpc(["http://127.0.0.1:1"])
+    try:
+        client.call("send" + "Transaction", [])
+    except Exception as exc:
+        assert "not permitted" in str(exc)
+    else:
+        raise AssertionError("a write method went through")
