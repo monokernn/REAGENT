@@ -27,7 +27,15 @@ It is built the way a Grok Bot team is built: **eight bots, one job each, a lead
 
 ## For agents: MCP
 
-`assayer mcp` serves REAGENT over the [Model Context Protocol](https://modelcontextprotocol.io). Claude, Cursor, or a trading bot of your own can read a token's contract before it trades, and get back the contract's own answer with the call it came from.
+REAGENT serves its readings over the [Model Context Protocol](https://modelcontextprotocol.io). Claude, Cursor, or a trading bot of your own can read a token's contract before it trades, and get back the contract's own answer with the call it came from.
+
+The desk hosts it, nothing to install:
+
+```bash
+claude mcp add --transport http reagent https://www.reagents.tech/api/mcp
+```
+
+Or run `assayer mcp` on your own machine, with two more tools for the assets you register:
 
 ```bash
 git clone https://github.com/monokernn/REAGENT.git && cd REAGENT
@@ -42,7 +50,9 @@ Then ask your agent in plain language:
 <details>
 <summary><b>Other clients</b> (Claude Desktop, Cursor)</summary>
 
-Add the server to the client's MCP config:
+Hosted: in Claude Desktop or claude.ai, Settings → Connectors → Add custom connector, and paste `https://www.reagents.tech/api/mcp`. Cursor takes `{"mcpServers": {"reagent": {"url": "https://www.reagents.tech/api/mcp"}}}`.
+
+On your machine, add the server to the client's MCP config:
 
 ```json
 {
