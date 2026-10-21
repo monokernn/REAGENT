@@ -344,6 +344,14 @@ export REAGENT_MODEL_KEY="…"
 export REAGENT_MODEL="reagent"
 ```
 
+Grok runs the same calls through xAI's OpenAI-compatible API:
+
+```bash
+export REAGENT_MODEL_URL="https://api.x.ai/v1"
+export REAGENT_MODEL_KEY="xai-…"
+export REAGENT_MODEL="grok-4"
+```
+
 Without `REAGENT_MODEL_URL`, the same calls go to any agent CLI that takes a prompt and returns JSON:
 
 ```toml
