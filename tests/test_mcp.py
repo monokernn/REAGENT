@@ -56,7 +56,8 @@ def test_the_handshake_names_reagent_and_offers_tools(tmp_path):
 
 def test_every_tool_is_declared_read_only(tmp_path):
     tools = server(tmp_path).handle({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})["result"]["tools"]
-    assert {t["name"] for t in tools} == {"read_token", "holder_clusters", "list_assets", "show_dossier"}
+    assert {t["name"] for t in tools} == {"read_token", "holder_clusters", "wallet_tokens",
+                                         "list_assets", "show_dossier"}
     for tool in tools:
         assert tool["annotations"]["readOnlyHint"] is True
         assert tool["annotations"]["destructiveHint"] is False
@@ -219,3 +220,52 @@ def test_the_solana_client_reads_signatures_and_still_refuses_to_send():
         assert "not permitted" in str(exc)
     else:
         raise AssertionError("a write method went through")
+
+
+# ---------------------------------------------------------------- wallet tokens
+
+CLEAN = "So11111111111111111111111111111111111111112"
+
+
+class WalletChain:
+    """A wallet's token accounts on both programs, and the mint accounts behind them."""
+
+    def __init__(self, by_program, mints):
+        self.by_program, self.mints = by_program, mints
+
+    def call(self, method, params):
+        if method == "getTokenAccountsByOwner":
+            rows = self.by_program.get(params[1]["programId"], [])
+            return {"value": [{"account": {"data": {"parsed": {"info": {
+                "mint": m, "tokenAmount": {"uiAmountString": str(a)}}}}}} for m, a in rows]}
+        if method == "getMultipleAccounts":
+            return {"context": {"slot": 4321}, "value": [self.mints.get(m) for m in params[0]]}
+        raise AssertionError(method)
+
+
+def test_a_wallet_lists_its_tokens_with_live_powers_first(tmp_path):
+    fee = {"extension": "transferFeeConfig", "state": {"transferFeeConfigAuthority": KEY_A}}
+    meta = {"extension": "tokenMetadata", "state": {"name": "Super Inu", "symbol": "SI"}}
+    chain = WalletChain(
+        {sol.TOKEN_PROGRAM: [(CLEAN, 5), ("EMPTY" * 8 + "1111", 0)],
+         sol.TOKEN_2022_PROGRAM: [(FEE_MINT, 76)]},
+        {CLEAN: mint_account(sol.TOKEN_PROGRAM),
+         FEE_MINT: mint_account(sol.TOKEN_2022_PROGRAM, freeze_authority=KEY_B, extensions=[fee, meta])})
+    result = call(server(tmp_path, chain), "wallet_tokens", address=W1)
+    assert result["isError"] is False
+    data = result["structuredContent"]
+    assert data["tokens"] == 2 and data["with_powers"] == 1 and data["slot"] == 4321
+    first, second = data["items"]
+    assert first["mint"] == FEE_MINT and first["symbol"] == "SI" and first["program"] == "token-2022"
+    assert first["powers_live"] == ["freeze", "transfer_tax"]
+    assert first["powers"][1]["field"] == "getMultipleAccounts(mint).transferFeeConfig.transferFeeConfigAuthority"
+    assert second["mint"] == CLEAN and second["powers_live"] == []
+    text = result["content"][0]["text"]
+    assert "with live powers: 1" in text and "⚠ $SI" in text and "no live power" in text
+    for word in FORBIDDEN:
+        assert not re.search(rf"\b{re.escape(word)}\b", text, re.IGNORECASE), word
+
+
+def test_a_bad_wallet_address_is_an_answer(tmp_path):
+    result = call(server(tmp_path, WalletChain({}, {})), "wallet_tokens", address="0xabc")
+    assert result["isError"] is True and "Solana wallet" in result["content"][0]["text"]

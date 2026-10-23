@@ -5,10 +5,11 @@ call tools a local program offers. This module offers the readings: the same
 reader the CLI snapshots with, the same slots, the same evidence, handed over as
 JSON-RPC on stdin and stdout so nothing has to be installed beside the package.
 
-Four tools, all read-only:
+Five tools, all read-only:
 
     read_token       read a token from its contract now; nothing is stored
     holder_clusters  the largest wallets of a Solana token, grouped by who funded them
+    wallet_tokens    the tokens a Solana wallet holds, and what each mint still permits
     list_assets      the assets registered in this project
     show_dossier     the latest sheet written for one of them
 
@@ -86,6 +87,25 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "address": {"type": "string", "description": "the token's mint address"},
+            },
+            "required": ["address"],
+            "additionalProperties": False,
+        },
+        "annotations": {**READ_ONLY, "openWorldHint": True},
+    },
+    {
+        "name": "wallet_tokens",
+        "title": "What a Solana wallet holds",
+        "description": (
+            "The tokens a Solana wallet holds, read from the chain, and for each mint "
+            "every authority still live over it: mint, freeze, permanent delegate, "
+            "pause, transfer hook, transfer fee. Each power names the account field it "
+            "was read from. Tokens with live powers come first. Read any one of them in "
+            "full with read_token."),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "address": {"type": "string", "description": "the wallet's address"},
             },
             "required": ["address"],
             "additionalProperties": False,
@@ -250,6 +270,38 @@ def holder_clusters(config: dict, address: str, rpc=None, holders=None) -> tuple
     return "\n".join(lines), data
 
 
+def _qty(amount: float) -> str:
+    return f"{amount:,.0f}" if amount >= 1000 else f"{amount:.6g}"
+
+
+def wallet_tokens(config: dict, address: str, rpc=None) -> tuple[str, dict]:
+    from .coin import wallet as wallet_mod
+    from .coin.solana import DEFAULT_RPCS, SolanaRpc, is_address
+    if rpc is None:
+        configured = (config.get("rpc") or {}).get(model.SOLANA)
+        urls = [configured] if isinstance(configured, str) and configured else []
+        rpc = SolanaRpc(urls + [u for u in DEFAULT_RPCS if u not in urls])
+    address = str(address).strip()
+    if not is_address(address):
+        raise ToolError(f"not a Solana wallet address: {address!r}")
+    data = wallet_mod.read_wallet(address, rpc)
+    lines = [f"REAGENT  ·  wallet  ·  solana:{address}"
+             + (f"  ·  slot {data['slot']}" if data["slot"] else ""), ""]
+    if not data["tokens"]:
+        return "\n".join(lines + ["this wallet holds no tokens"]), data
+    lines.append(f"TOKENS: {data['tokens']}  ·  read {data['read']}  ·  with live powers: {data['with_powers']}")
+    for t in data["items"]:
+        label = " ".join(x for x in (t["symbol"] and f"${t['symbol']}", _short(t["mint"])) if x)
+        if t["powers_live"]:
+            lines.append(f"  ⚠ {label}  ·  {_qty(t['amount'])} held  ·  live: {', '.join(t['powers_live'])}")
+            for p in t["powers"]:
+                lines.append(f"      ↳ {p['power']} held by {_short(p['holder'])} · {p['field']}")
+        else:
+            lines.append(f"  ○ {label}  ·  {_qty(t['amount'])} held  ·  no live power")
+    lines += ["", "This reading shows what each mint permits. The person decides."]
+    return "\n".join(lines), data
+
+
 def list_assets(p: util.Paths) -> tuple[str, dict]:
     from .verify import gate as gate_mod
     assets = model.list_assets(p)
@@ -326,6 +378,10 @@ class Server:
                     raise ToolError("address is required")
                 text, data = holder_clusters(self._config(), str(args["address"]), rpc=self.rpc,
                                              holders=self.holders)
+            elif name == "wallet_tokens":
+                if not args.get("address"):
+                    raise ToolError("address is required")
+                text, data = wallet_tokens(self._config(), str(args["address"]), rpc=self.rpc)
             elif name == "list_assets":
                 text, data = list_assets(self._paths())
             elif name == "show_dossier":

@@ -6,7 +6,7 @@
 
 **RWA Evidence Agent.** Reads a token and writes one sheet on which every line names the function, the block or the page it came from.
 
-![tests](https://img.shields.io/badge/tests-170%20passing-2ea44f)
+![tests](https://img.shields.io/badge/tests-172%20passing-2ea44f)
 ![MCP](https://img.shields.io/badge/MCP-server-8a5cf6)
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
@@ -74,6 +74,7 @@ If the app cannot see your `PATH`, give the full path to the executable (on Wind
 |---|---|
 | `read_token` | the token read from the chain right now: all twelve readings, the agent that owns each, and the call it came from. Solana, or an EVM chain with an `[rpc]` entry |
 | `holder_clusters` | the 100 largest wallets of a Solana token, grouped by the address that first funded each, with the share of supply every cluster holds. Exchanges and busy hubs listed apart. Funding addresses reported by Jupiter |
+| `wallet_tokens` | the tokens a Solana wallet holds, read from the chain, and every authority still live over each mint: mint, freeze, permanent delegate, pause, transfer hook, transfer fee. Tokens with live powers first |
 | `list_assets` | the assets registered in the project, and how many sheets each has |
 | `show_dossier` | the latest sheet for one of them, as `assayer show` prints it |
 
