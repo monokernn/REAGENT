@@ -209,6 +209,22 @@ min_burnt_lp_pct = 95.0
 
 A changed fee, a raised cap or a flipped switch changes the snapshot. A drifting balance does not, so `watch` reports movement that matters.
 
+### Watch in Telegram
+
+The desk's bot, [@reagentss_bot](https://t.me/reagentss_bot), puts Solana tokens under watch: a report every morning, and an alert the hour a power over balances appears, liquidity drains, holders concentrate or the grade moves.
+
+One token is free. Holding REAGENT opens more:
+
+| held | tokens under watch |
+|---|---|
+| — | 1 |
+| 300K | 3 |
+| 1M | 10 |
+| 3M | 25 |
+| 10M | 50 |
+
+`/verify` gives an amount of SOL unique to that request. The holder sends it from the wallet to itself and the bot finds the transfer on chain; only the wallet's own key can sign it, so that transfer is the proof. The balance is read again every 12 hours.
+
 ### Notes
 
 `assayer notes si` adds a few sentences per agent on top of the twelve readings, through your agent CLI or REAGENT's model. Every figure in a sentence has to be a figure already on the sheet, and the result passes the same language linter as the sheet. `assayer notes si --recheck` replays everything already written under today's rules, for free.
