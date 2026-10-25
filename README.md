@@ -215,19 +215,19 @@ The desk's bot, [@reagentss_bot](https://t.me/reagentss_bot), puts Solana tokens
 
 One token is free. Holding REAGENT opens more:
 
-| held | tokens under watch |
-|---|---|
-| — | 1 |
-| 300K | 3 |
-| 1M | 10 |
-| 3M | 25 |
-| 10M | 50 |
+| held | tokens under watch | wallet scans a day |
+|---|---|---|
+| — | 1 | 5 |
+| 300K | 3 | 15 |
+| 1M | 10 | 40 |
+| 3M | 25 | 100 |
+| 10M | 50 | 100 |
 
 `/verify` gives an amount of SOL unique to that request. The holder sends it from the wallet to itself and the bot finds the transfer on chain; only the wallet's own key can sign it, so that transfer is the proof. The balance is read again every 12 hours.
 
 ### Wallet scan
 
-Send the bot a wallet address, or `/scan <wallet>`, and it answers with a card and a breakdown:
+Send the bot a wallet address, or `/scan <wallet>`, and it answers with a card and a breakdown. The same wallet again within five minutes is not counted against the day's scans.
 
 | part | what it is |
 |---|---|
