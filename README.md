@@ -225,6 +225,22 @@ One token is free. Holding REAGENT opens more:
 
 `/verify` gives an amount of SOL unique to that request. The holder sends it from the wallet to itself and the bot finds the transfer on chain; only the wallet's own key can sign it, so that transfer is the proof. The balance is read again every 12 hours.
 
+### Wallet scan
+
+Send the bot a wallet address, or `/scan <wallet>`, and it answers with a card and a breakdown:
+
+| part | what it is |
+|---|---|
+| Net worth | SOL and tokens at today's prices, with risky holdings counted |
+| PnL | profit or loss in SOL on tokens bought in the last 300 transactions, win rate, best and worst trade |
+| Style | how long it holds, its usual buy, trades a day, the venues it trades on |
+| Top holdings | the largest positions with their grade, linked to DEX Screener |
+| Latest trades | buys and sells against SOL, USDC or USDT |
+| Linked wallets | the wallets it moves SOL with most; pools, exchanges and busy hubs are left out |
+| Origin | when the wallet started and who sent it its first SOL |
+
+Tokens bought and not sold are valued at today's price, whether they sit in the wallet or moved on. Holdings and most prices come from Helius; the tokens Helius does not price come from Jupiter, then DEX Screener.
+
 ### Early buyers
 
 A Solana sheet on [reagents.tech](https://www.reagents.tech) lists who bought the token in its creation block and the next two, the creator included, read from the token's first transactions on chain:
