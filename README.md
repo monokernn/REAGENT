@@ -239,6 +239,8 @@ Send the bot a wallet address, or `/scan <wallet>`, and it answers with a card a
 | Linked wallets | the wallets it moves SOL with most; pools, exchanges and busy hubs are left out |
 | Origin | when the wallet started and who sent it its first SOL |
 
+The same scan runs on [reagents.tech](https://www.reagents.tech) under Scan a wallet, with everything the wallet holds graded below it.
+
 Tokens bought and not sold are valued at today's price, whether they sit in the wallet or moved on. Holdings and most prices come from Helius; the tokens Helius does not price come from Jupiter, then DEX Screener.
 
 ### Early buyers
