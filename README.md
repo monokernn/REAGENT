@@ -215,15 +215,25 @@ The desk's bot, [@reagentss_bot](https://t.me/reagentss_bot), puts Solana tokens
 
 One token is free. Holding REAGENT opens more:
 
-| held | tokens under watch | wallet scans a day |
-|---|---|---|
-| — | 1 | 5 |
-| 300K | 3 | 15 |
-| 1M | 10 | 40 |
-| 3M | 25 | 100 |
-| 10M | 50 | 100 |
+| held | tokens under watch | wallet scans a day | wallets with trade alerts |
+|---|---|---|---|
+| — | 1 | 5 | 0 |
+| 300K | 3 | 15 | 3 |
+| 1M | 10 | 40 | 10 |
+| 3M | 25 | 100 | 20 |
+| 10M | 50 | 100 | 40 |
 
 `/verify` gives an amount of SOL unique to that request. The holder sends it from the wallet to itself and the bot finds the transfer on chain; only the wallet's own key can sign it, so that transfer is the proof. The balance is read again every 12 hours.
+
+### Wallet trade alerts
+
+Open Wallet alerts in [@reagentss_bot](https://t.me/reagentss_bot) to follow a Solana wallet's buys and sells. Choose both sides or just one. The bot sends a trade card with Buy/Sell buttons that open the selected token on [reagents.tech](https://www.reagents.tech); the visitor confirms the trade in their own wallet.
+
+The initial fill of a holder tier is included, followed by ten replacement addresses per UTC day. An address pauses until the next UTC day at 500 trading events a day or above 20 a minute. Transfers, airdrops, failed transactions and ambiguous swaps are skipped. Wallet scans and tracked-wallet slots have separate allowances.
+
+A wallet scan on the site has a Wallet alerts button that carries the address into the bot for confirmation. My wallet shows the verified wallet and its holder access.
+
+The hosted implementation lives in the desk repository. This public repository's [maintenance workflow](.github/workflows/wallet-alerts.yml) reconciles subscriptions and retries pending notifications. Maintainers must set the existing server `WATCH_CRON_KEY` as an Actions secret here; `WATCH_URL` is optional. The shared feature budget is 100,000 Helius credits per UTC day, with an early shutdown reserve. Provider delivery and retry timing can cause the actual billed usage to exceed the application counter.
 
 ### Wallet scan
 

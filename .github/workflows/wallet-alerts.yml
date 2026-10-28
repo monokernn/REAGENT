@@ -1,0 +1,32 @@
+# Public repository: standard GitHub-hosted runners do not consume private-repo minutes.
+# The endpoint is authenticated; the key belongs only in repository Actions secrets.
+name: wallet-alerts
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: wallet-alert-maintenance
+  cancel-in-progress: false
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Maintain wallet alerts
+        env:
+          WATCH_CRON_KEY: ${{ secrets.WATCH_CRON_KEY }}
+          WATCH_URL: ${{ vars.WATCH_URL || 'https://www.reagents.tech/api/index' }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          key = os.environ.get('WATCH_CRON_KEY')
+          if not key:
+              raise SystemExit('Set the existing WATCH_CRON_KEY as an Actions secret in this repository.')
+          payload = json.dumps({'action': 'wallet_alerts_tick', 'key': key}).encode()
+          req = urllib.request.Request(os.environ['WATCH_URL'], data=payload, headers={'Content-Type':'application/json'})
+          with urllib.request.urlopen(req, timeout=65) as response:
+              print(response.read().decode())
+          PY
