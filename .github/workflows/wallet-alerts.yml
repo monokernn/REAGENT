@@ -13,7 +13,7 @@ concurrency:
 jobs:
   maintain:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
       - name: Maintain wallet alerts
         env:
@@ -43,6 +43,6 @@ jobs:
               raise SystemExit('WATCH_CRON_KEY is required.')
           data = json.dumps({'action': 'ai_tick', 'key': key}).encode()
           req = urllib.request.Request(os.environ['WATCH_URL'], data=data, headers={'Content-Type': 'application/json'})
-          with urllib.request.urlopen(req, timeout=65) as response:
+          with urllib.request.urlopen(req, timeout=125) as response:
               print(response.read().decode())
           PY
