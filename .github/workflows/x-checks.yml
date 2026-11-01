@@ -1,15 +1,30 @@
 # X credentials stay in Vercel; reuse the existing maintenance secret.
+# Long sessions queue their successor; cron is only a fallback.
+# To stop: set the repository variable X_CHECKS_PAUSED=1, then cancel the active run.
 name: x-checks
 on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+    inputs:
+      seconds:
+        description: 'Session duration (60 seconds verifies handoff; the successor runs the normal duration)'
+        type: choice
+        default: '21000'
+        options:
+          - '21000'
+          - '60'
 permissions:
   contents: read
+  actions: write
+concurrency:
+  group: x-checks-service
+  cancel-in-progress: false
 jobs:
   check:
+    if: ${{ vars.X_CHECKS_PAUSED != '1' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 9
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,4 +35,6 @@ jobs:
         env:
           WATCH_CRON_KEY: ${{ secrets.WATCH_CRON_KEY }}
           WATCH_URL: ${{ vars.WATCH_URL || 'https://www.reagents.tech/api/index' }}
-        run: python3 tools/x_checks_runner.py --seconds 330
+          GITHUB_TOKEN: ${{ github.token }}
+          RUN_SECONDS: ${{ inputs.seconds || '21000' }}
+        run: python3 tools/x_checks_runner.py --seconds "$RUN_SECONDS" --continue-workflow

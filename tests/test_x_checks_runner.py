@@ -6,6 +6,8 @@ import threading
 import time
 import urllib.error
 
+import pytest
+
 
 spec = importlib.util.spec_from_file_location('x_checks_runner', Path(__file__).resolve().parents[1] / 'tools/x_checks_runner.py')
 runner = importlib.util.module_from_spec(spec)
@@ -51,3 +53,53 @@ def test_network_errors_are_redacted_and_loop_can_continue(monkeypatch, capsys):
     monkeypatch.setattr(runner.urllib.request, 'urlopen', fail)
     assert runner.call('https://example.test', 'private-key', 'x_check_work') is None
     assert 'private-key' not in capsys.readouterr().out
+
+
+def test_continuation_queues_one_normal_session_with_no_duration_override(monkeypatch, capsys):
+    calls = []
+
+    class Ack:
+        status = 204
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+
+    def send(request, timeout):
+        calls.append(request)
+        assert request.full_url == 'https://api.github.com/repos/owner/project/actions/workflows/x-checks.yml/dispatches'
+        assert json.loads(request.data) == {'ref': 'main'}
+        assert request.get_header('Authorization') == 'Bearer test-token'
+        return Ack()
+
+    monkeypatch.setattr(runner.urllib.request, 'urlopen', send)
+    runner.continue_workflow({'GITHUB_TOKEN': 'test-token', 'GITHUB_REPOSITORY': 'owner/project'})
+    assert len(calls) == 1
+    assert 'test-token' not in capsys.readouterr().out
+
+
+def test_continuation_recovers_transient_failure_with_bounded_retries(monkeypatch):
+    attempts = []
+
+    def fail(*args, **kwargs):
+        attempts.append(1)
+        raise urllib.error.URLError('private-credential')
+
+    monkeypatch.setattr(runner.urllib.request, 'urlopen', fail)
+    monkeypatch.setattr(runner.time, 'sleep', lambda seconds: None)
+    with pytest.raises(RuntimeError, match='connection failed') as exc:
+        runner.continue_workflow({'GITHUB_TOKEN': 'test-token', 'GITHUB_REPOSITORY': 'owner/project'})
+    assert len(attempts) == 3
+    assert 'private-credential' not in str(exc.value)
+
+
+def test_continuation_does_not_retry_permission_errors(monkeypatch):
+    attempts = []
+
+    def fail(*args, **kwargs):
+        attempts.append(1)
+        raise urllib.error.HTTPError('https://api.github.com', 403, 'private-response', {}, None)
+
+    monkeypatch.setattr(runner.urllib.request, 'urlopen', fail)
+    with pytest.raises(RuntimeError, match='HTTP 403') as exc:
+        runner.continue_workflow({'GITHUB_TOKEN': 'test-token', 'GITHUB_REPOSITORY': 'owner/project'})
+    assert len(attempts) == 1
+    assert 'private-response' not in str(exc.value)
