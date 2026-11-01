@@ -3,12 +3,34 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.request
 
 INTERVAL = 5
 RUN_SECONDS = 21000  # 5h 50m, below GitHub's six-hour job timeout.
+_LAST_ERRORS = {}
+
+
+def log_health(action, result):
+    """Log safe error classifications, never posts, URLs or response bodies."""
+    rows = {'response': result, 'poll': result.get('poll') or {}}
+    rows.update(result.get('result') or {})
+    for stage, row in rows.items():
+        if not isinstance(row, dict):
+            continue
+        key = (action, stage)
+        if not row.get('error'):
+            _LAST_ERRORS.pop(key, None)
+            continue
+        def safe(value):
+            text = str(value or '')
+            return text if re.fullmatch(r'[A-Za-z0-9_]{1,64}', text) else 'redacted'
+        state = (safe(row.get('state')), safe(row.get('error')), safe(row.get('error_code')))
+        if _LAST_ERRORS.get(key) != state:
+            print('X handler:', action, stage, *state, flush=True)
+            _LAST_ERRORS[key] = state
 
 
 def call(url, key, action):
@@ -17,6 +39,7 @@ def call(url, key, action):
     try:
         with urllib.request.urlopen(request, timeout=125 if action == 'x_check_work' else 30) as response:
             result = json.load(response)
+        log_health(action, result)
         # Do not log report contents, identities, auth headers or response bodies.
         if result.get('poll', {}).get('queued'):
             print('Queued new X checks.', flush=True)
@@ -25,6 +48,10 @@ def call(url, key, action):
         return result
     except urllib.error.HTTPError as exc:
         print('X maintenance HTTP', exc.code, flush=True)
+        try:
+            log_health(action, json.load(exc))
+        except Exception:
+            pass
     except Exception as exc:
         print('X maintenance:', type(exc).__name__, flush=True)
     return None

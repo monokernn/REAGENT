@@ -103,3 +103,22 @@ def test_continuation_does_not_retry_permission_errors(monkeypatch):
         runner.continue_workflow({'GITHUB_TOKEN': 'test-token', 'GITHUB_REPOSITORY': 'owner/project'})
     assert len(attempts) == 1
     assert 'private-response' not in str(exc.value)
+
+
+def test_http_200_handler_failure_is_visible_without_leaking_response(capsys):
+    runner._LAST_ERRORS.clear()
+    result = {'result': {'delivery': {'state': 'retry_later', 'error': 'XError',
+                                      'error_code': 'post_missing_data', 'reply': 'private post text'}}}
+    runner.log_health('x_check_work', result)
+    runner.log_health('x_check_work', result)
+    output = capsys.readouterr().out
+    assert output.count('X handler:') == 1
+    assert 'post_missing_data' in output and 'retry_later' in output
+    assert 'private post text' not in output
+
+
+def test_health_error_values_cannot_leak_provider_urls(capsys):
+    runner._LAST_ERRORS.clear()
+    runner.log_health('x_check_poll', {'error': 'https://provider.test/?secret=private'})
+    output = capsys.readouterr().out
+    assert 'redacted' in output and 'private' not in output and 'provider' not in output
