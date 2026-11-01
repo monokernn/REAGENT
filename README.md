@@ -253,6 +253,14 @@ The same scan runs on [reagents.tech](https://www.reagents.tech) under Scan a wa
 
 Tokens bought and not sold are valued at today's price, whether they sit in the wallet or moved on. Holdings and most prices come from Helius; the tokens Helius does not price come from Jupiter, then DEX Screener.
 
+### Token checks on X
+
+Mention [@reagent_rwa](https://x.com/reagent_rwa) in the visible text of a post or reply with a token CA or token link. The crew returns its assessment, a risk grade and a saved full report. Supported networks: Solana, Robinhood Chain, Ethereum, Base and BNB Chain.
+
+A bare EVM address is checked across the supported networks. If it belongs to tokens on more than one, the bot asks which network to use before running the analysis. Reply with `@reagent_rwa Base`, for example; the previous CA is retained. A new CA in the reply takes priority. The exact `$REAGENT` cashtag resolves to the project mint; other tickers need an address or token link.
+
+The hosted report uses a fixed 100-point risk scale. Unverified checks widen the possible score and grade, such as A-B, with missing data named beside the result. Confirmed risks remain in the minimum score. With no usable scoring evidence, the grade is withheld.
+
 ### Early buyers
 
 A Solana sheet on [reagents.tech](https://www.reagents.tech) lists who bought the token in its creation block and the next two, the creator included, read from the token's first transactions on chain:
