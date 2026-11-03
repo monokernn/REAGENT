@@ -510,3 +510,7 @@ minimum (2% of REAGENT supply by default). Invite approvals are tied to a Telegr
 account, and periodic checks enforce continued eligibility after a warning period.
 The wallet-alerts workflow includes an independent holder-access maintenance job
 using the existing authenticated endpoint and Actions secret.
+
+The optional `WHALE_ALLOWLIST_IDS` setting grants selected Telegram user IDs
+private-group access without a wallet or holding, independently of bot operator
+permissions. IDs are comma-separated; saving the setting requires a redeploy.
