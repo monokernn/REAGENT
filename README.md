@@ -211,6 +211,8 @@ A changed fee, a raised cap or a flipped switch changes the snapshot. A drifting
 
 ### Watch in Telegram
 
+The first menu action, **Full AI report**, runs the site's crew analysis. Use **Add to your group** to add the bot as an administrator, then send `/ai@reagentss_bot <CA>` or mention it in a reply to a token message. The group receives a risk card, assessment, website report and private full-report link. Solana, Robinhood Chain, Ethereum, Base and BNB Chain are supported. The inviter's verified REAGENT holding unlocks 1–4 groups and 5–100 daily reports shared across their groups, separately from personal AI limits. `/help`, `/limits` and `/refresh` explain usage and access. Active communities can apply for complimentary access through @hxrn4.
+
 The desk's bot, [@reagentss_bot](https://t.me/reagentss_bot), puts Solana tokens under watch: a report every morning, and an alert the hour a power over balances appears, liquidity drains, holders concentrate or the grade moves.
 
 One token is free. Holding REAGENT opens more:
