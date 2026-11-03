@@ -500,3 +500,13 @@ python -m pytest -q        # 170 passing
 ## License
 
 MIT.
+
+
+### Whale Chat
+
+The Telegram bot can manage a private holder group through its **Join Whale Chat**
+button. Entry uses a verified wallet and a fresh holding check, with a configurable
+minimum (2% of REAGENT supply by default). Invite approvals are tied to a Telegram
+account, and periodic checks enforce continued eligibility after a warning period.
+The wallet-alerts workflow includes an independent holder-access maintenance job
+using the existing authenticated endpoint and Actions secret.
