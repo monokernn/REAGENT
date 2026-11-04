@@ -261,7 +261,9 @@ Mention [@reagent_rwa](https://x.com/reagent_rwa) in the visible text of a post 
 
 A bare EVM address is checked across the supported networks. If it belongs to tokens on more than one, the bot asks which network to use before running the analysis. Reply with `@reagent_rwa Base`, for example; the previous CA is retained. A new CA in the reply takes priority. The exact `$REAGENT` cashtag resolves to the project mint; other tickers need an address or token link.
 
-The hosted report uses a fixed 100-point risk scale. Unverified checks widen the possible score and grade, such as A-B, with missing data named beside the result. Confirmed risks remain in the minimum score. With no usable scoring evidence, the grade is withheld.
+The hosted report uses a deterministic v2 risk scale from 0 to 100: contract restrictions (35), holder distribution (25), liquidity and exits (25), and linked positions/creator activity (15). Fifteen subchecks use interpolated measurements and explicit critical-risk minimums. Provider findings support named checks rather than adding duplicate penalties.
+
+Solana reports use Helius to inspect early-wallet links, current sampled positions and recent creator sales. Shared funding alone does not prove common ownership. Missing checks widen the possible score and grade, such as A-B, including possible critical outcomes. Data completeness is shown separately; the model explains the calculated result. With no usable scoring evidence, the grade is withheld. [Scoring rules](https://github.com/monokernn/reagentUI/blob/main/SCORING.md).
 
 ### Early buyers
 
