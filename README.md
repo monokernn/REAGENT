@@ -259,6 +259,10 @@ Tokens bought and not sold are valued at today's price, whether they sit in the 
 
 Mention [@reagent_rwa](https://x.com/reagent_rwa) in the visible text of a post or reply with a token CA or token link. The crew returns its assessment, a risk grade and a saved full report. Supported networks: Solana, Robinhood Chain, Ethereum, Base and BNB Chain.
 
+For a Solana buyback, burn or liquidity-lock claim, tag the bot with the CA and transaction links. It checks the source statement and returns **Confirmed**, **Partly confirmed** or **Insufficient evidence**, with an explanation and available receipts. Purchases are distinguished from transfers, and a lock reading must match the selected pool. Exact quantities, ownership and lock duration require their own evidence; provider-only lock information remains partial. A transaction link can identify the token when a verified purchase or burn points to exactly one mint.
+
+Saved report pages now open with a compact risk overview, a live token chart and an expandable wallet map. **View detailed findings** reveals the complete research, creator history, rating factors, crew notes and scenarios. Live market data and claim findings do not rewrite the saved risk assessment.
+
 A bare EVM address is checked across the supported networks. If it belongs to tokens on more than one, the bot asks which network to use before running the analysis. Reply with `@reagent_rwa Base`, for example; the previous CA is retained. A new CA in the reply takes priority. The exact `$REAGENT` cashtag resolves to the project mint; other tickers need an address or token link.
 
 The hosted report uses a deterministic v3 risk scale from 0 to 100: contract restrictions (35), holder distribution (25), liquidity and exits (25), and linked positions/exit exposure (15). Fifteen subchecks use interpolated measurements and explicit critical-risk minimums. Provider findings support named checks rather than adding duplicate penalties.
