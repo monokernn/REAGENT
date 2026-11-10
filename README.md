@@ -211,7 +211,7 @@ A changed fee, a raised cap or a flipped switch changes the snapshot. A drifting
 
 ### Watch in Telegram
 
-The first menu action, **Full AI report**, runs the site's crew analysis. Use **Add to your group** to add the bot as an administrator, then send `/ai@reagentss_bot <CA>` or mention it in a reply to a token message. The group receives a risk card, assessment, website report and private full-report link. Solana, Robinhood Chain, Ethereum, Base and BNB Chain are supported. The inviter's verified REAGENT holding unlocks 1–4 groups and 5–100 daily reports shared across their groups, separately from personal AI limits. `/help`, `/limits` and `/refresh` explain usage and access. Active communities can apply for complimentary access through @hxrn4.
+The first menu action, **Full AI report**, runs the site's crew analysis. Use **Add to your group** to add the bot as an administrator, then send `/ai@reagentss_bot <CA>` or mention it in a reply to a token message. The group receives a risk card, assessment, website report and private full-report link. Solana, Robinhood Chain, Ethereum, Base, BNB Chain and Elysium are supported. The inviter's verified REAGENT holding unlocks 1–4 groups and 5–100 daily reports shared across their groups, separately from personal AI limits. `/help`, `/limits` and `/refresh` explain usage and access. Active communities can apply for complimentary access through @hxrn4.
 
 The desk's bot, [@reagentss_bot](https://t.me/reagentss_bot), puts Solana tokens under watch: a report every morning, and an alert the hour a power over balances appears, liquidity drains, holders concentrate or the grade moves.
 
@@ -257,7 +257,7 @@ Tokens bought and not sold are valued at today's price, whether they sit in the 
 
 ### Token checks on X
 
-Mention [@reagent_rwa](https://x.com/reagent_rwa) in the visible text of a post or reply with a token CA or token link. The crew returns its assessment, a risk grade and a saved full report. Supported networks: Solana, Robinhood Chain, Ethereum, Base and BNB Chain.
+Mention [@reagent_rwa](https://x.com/reagent_rwa) in the visible text of a post or reply with a token CA or token link. The crew returns its assessment, a risk grade and a saved full report. Supported networks: Solana, Robinhood Chain, Ethereum, Base, BNB Chain and Elysium.
 
 For a Solana buyback, burn or liquidity-lock claim, tag the bot with the CA and transaction links. It checks the source statement and returns **Confirmed**, **Partly confirmed** or **Insufficient evidence**, with an explanation and available receipts. Purchases are distinguished from transfers, and a lock reading must match the selected pool. Exact quantities, ownership and lock duration require their own evidence; provider-only lock information remains partial. A transaction link can identify the token when a verified purchase or burn points to exactly one mint.
 
